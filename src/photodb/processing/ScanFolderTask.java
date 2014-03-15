@@ -21,18 +21,24 @@ class ScanFolderTask implements Runnable {
 
     public ScanFolderTask(String path, FolderScanner parent) {
         _activeSubFolderScans.release();
+        LOG.log(Level.FINEST, "queued scan of {0}, with queued sfs: {1}", 
+                new Object[]{path, _activeSubFolderScans.availablePermits()});
         this.path = path;
         this.parent = parent;
     }
 
     @Override
     public void run() {
+        LOG.log(Level.FINE, "initiating scan of {0}, with queued sfs: {1}", 
+                new Object[]{path, _activeSubFolderScans.availablePermits()});
         FolderScanner fs = new FolderScanner(path, parent);
         fs.queuePhotoJobs();
         try {
             _activeSubFolderScans.acquire();
+            LOG.log(Level.FINEST, "scan of {0}, reduced queued sfs to {1}", 
+                new Object[]{path, _activeSubFolderScans.availablePermits()});
             if(_activeSubFolderScans.availablePermits() == 0) {
-                LOG.log(Level.FINE, "Releasing ScansDoneSemaphore after Scanning {0}", path);
+                LOG.log(Level.FINEST, "Releasing ScansDoneSemaphore after Scanning {0}", path);
                 _scansDoneSemaphore.release();
             }
         } catch (InterruptedException ex) {
@@ -53,4 +59,19 @@ class ScanFolderTask implements Runnable {
         }
     }
     
+    public static void preventClosing() {
+        _activeSubFolderScans.release();
+    }
+    
+    public static void allowClosing() {
+        try {
+            _activeSubFolderScans.acquire();
+            if(_activeSubFolderScans.availablePermits() == 0) {
+                LOG.log(Level.FINEST, "Releasing ScansDoneSemaphore after closing was allowed}");
+                _scansDoneSemaphore.release();
+            }
+        } catch (InterruptedException e) {
+            LOG.log(Level.SEVERE, "Interrupted while waiting allowing closure..", e);
+        }
+    }
 }

@@ -11,7 +11,7 @@ import java.util.logging.Logger;
  * @version 1.0
  */
 public class ScanPhotoTask implements Runnable {
-    private final static Logger LOG = Logger.getLogger(FolderScanner.class.getName());
+    private final static Logger LOG = Logger.getLogger(ScanPhotoTask.class.getName());
     private static Integer processed = 0;
     private final String path;
 
@@ -21,9 +21,15 @@ public class ScanPhotoTask implements Runnable {
 
     @Override
     public void run() {
-        LOG.log(Level.INFO, "Would have scanned image at: {0}", path);
+        
+        try {
+            Thread.sleep(System.currentTimeMillis() %4000);
+        } catch (InterruptedException ex) {
+            LOG.log(Level.SEVERE, "Interrupted", ex);
+        }
         synchronized(LOG) {
             processed++;
+            LOG.log(Level.FINE, "Would have scanned image at: {0}", path);
         }
     }
     
