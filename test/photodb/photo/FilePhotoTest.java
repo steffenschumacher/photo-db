@@ -24,7 +24,7 @@ public class FilePhotoTest {
     final static private Logger LOG = Logger.getLogger(FilePhotoTest.class.getName());
     
     static {
-        final Level lvl = Level.FINEST;
+        final Level lvl = Level.ALL;
         Handler h = new ConsoleHandler();
         h.setLevel(lvl);
         h.setFormatter(new ConsoleFormatter());
@@ -51,7 +51,7 @@ public class FilePhotoTest {
     }
 
     /**
-     * Test of getHRes method, of class FilePhoto.
+     * Test of IMG_1127.jpg using class FilePhoto.
      */
     @Test
     public void testIMG1127() {
@@ -60,13 +60,47 @@ public class FilePhotoTest {
         FilePhoto instance;
         try {
             instance = new FilePhoto(folder + img);
-            int expResult = 1536;
-            int result = instance.getHRes();
-            assertEquals(expResult, result);
+            assertEquals(1536, instance.getHRes());
+            assertEquals(2048, instance.getVRes());
+            assertEquals(new Date(1117716280000L), instance.getShotDate());
+            assertEquals("Canon DIGITAL IXUS 500", instance.getCamera());
         } catch (ImageProcessingException | IOException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
             fail("Unhandled exception: "+ex.getMessage() + ".");
         }
     }
 
+    /**
+     * Test of IMG_1127.jpg using class FilePhoto.
+     */
+    @Test
+    public void testnr_045() {
+        final String img = "nr-045.JPG";
+        System.out.println(img);
+        FilePhoto instance;
+        try {
+            dumpImg(img);
+            instance = new FilePhoto(folder + img);
+            assertEquals(2848, instance.getHRes());
+            assertEquals(4288, instance.getVRes());
+            assertEquals(new Date(1250338719000L), instance.getShotDate());
+            assertEquals("NIKON D300", instance.getCamera());
+        } catch (ImageProcessingException | IOException ex) {
+            LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
+            fail("Unhandled exception: "+ex.getMessage() + ".");
+        }
+    }
+
+    public void dumpImg(String img) {
+        FilePhoto instance;
+        try {
+            instance = new FilePhoto(folder + img);
+            System.err.println(instance.getHRes() + "x" + instance.getVRes() + ",");
+            System.err.println("D: " + instance.getShotDate() + ", " + instance.getShotDate().getTime() + ",");
+            System.err.println("Camera: " + instance.getCamera());
+        } catch (ImageProcessingException | IOException ex) {
+            LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
+            fail("Unhandled exception: "+ex.getMessage() + ".");
+        }
+    }
 }

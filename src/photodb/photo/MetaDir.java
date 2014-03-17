@@ -1,6 +1,7 @@
 package photodb.photo;
 
 import com.drew.metadata.Directory;
+import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.exif.ExifSubIFDDirectory;
 import com.drew.metadata.jpeg.JpegDirectory;
 import java.util.ArrayList;
@@ -29,7 +30,7 @@ public class MetaDir {
                 ));
         map.put(ExifSubIFDDirectory.class,
                 new MetaDir(
-                        new int[]{},
+                        new int[]{ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL},
                         new int[]{ExifSubIFDDirectory.TAG_EXIF_IMAGE_WIDTH},
                         new int[]{ExifSubIFDDirectory.TAG_EXIF_IMAGE_HEIGHT},
                         new int[]{},
@@ -42,6 +43,14 @@ public class MetaDir {
                         new int[]{InteroperabilityDirectory.TAG_INTOP_IMAGE_HEIGHT},
                         new int[]{},
                         new int[]{}
+                ));
+        map.put(ExifIFD0Directory.class,
+                new MetaDir(
+                        new int[]{ExifIFD0Directory.TAG_DATETIME},
+                        new int[]{},
+                        new int[]{},
+                        new int[]{},
+                        new int[]{ExifIFD0Directory.TAG_MODEL}
                 ));
     }
     

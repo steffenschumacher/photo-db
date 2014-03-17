@@ -22,7 +22,7 @@ public class ConsoleFormatter extends Formatter {
 
         sb.append(new Date(record.getMillis()))
                 .append(" ")
-                .append(record.getLoggerName())
+                .append(record.getLoggerName().replaceAll(".*\\.", ""))
                 .append(" ")
                 .append(record.getLevel().getLocalizedName())
                 .append(": ")

@@ -6,24 +6,21 @@ import com.drew.metadata.Directory;
 import com.drew.metadata.Metadata;
 import com.drew.metadata.MetadataException;
 import com.drew.metadata.Tag;
-import com.drew.metadata.exif.ExifSubIFDDirectory;
-import com.drew.metadata.jfif.JfifDirectory;
-import com.drew.metadata.jpeg.JpegDirectory;
 import java.awt.Point;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
-import java.util.Set;
+import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
-import photodb.photo.dir.InteroperabilityDirectory;
 
 /**
  * FilePhoto - short description. Detailed description.
@@ -36,6 +33,23 @@ public class FilePhoto extends Photo {
     private final static Logger LOG = Logger.getLogger(FilePhoto.class.getName());
     // Find filename without absolute path, and separate extention.
     private final static Pattern _patFile = Pattern.compile("^(.*[\\/\\\\]|)([^\\/^\\\\]+)\\.([^\\.]+)$");
+    //<editor-fold defaultstate="collapsed" desc="static reflection methods for calling parameter-specific methods">
+    private final static Method getDeclaredSearchMethod(String method) {
+        try {
+            return FilePhoto.class.getDeclaredMethod(method, new Class[]{Directory.class});
+            
+        } catch (NoSuchMethodException | SecurityException ex) {
+            LOG.log(Level.SEVERE, "Code Error! Unable to get method: " + method, ex);
+            return null;
+        }
+        
+    }
+    private final static Method _metFindResolution = getDeclaredSearchMethod("findResolutionInDir");
+    private final static Method _metFindShotDate = getDeclaredSearchMethod("findShotDateInDir");
+    private final static Method _metFindCamera = getDeclaredSearchMethod("findCameraInDir");
+    
+    //</editor-fold>
+
 
     protected final int vRes;
     protected final int hRes;
@@ -55,7 +69,7 @@ public class FilePhoto extends Photo {
         fileName = fileNameNoExtention + "." + m.group(3);
         Metadata metadata = ImageMetadataReader.readMetadata(new File(absPath));
         directories = MetaDir.getDirectories();
-        logMetadata(metadata);
+        //logMetadata(metadata);
         Point res = findResolution(metadata);
         vRes = (int) res.getY();
         hRes = (int) res.getX();
@@ -63,6 +77,13 @@ public class FilePhoto extends Photo {
         shotDate = findShotDate(metadata);
     }
 
+    @Override
+    public String toString() {
+        return "FilePhoto{" + fileName + "(" + vRes + "x" + hRes + ", shot " + shotDate + ", using " + camera + ")}";
+    }
+
+    
+    
     //<editor-fold defaultstate="collapsed" desc="Implement abstract getters from Photo">
     @Override
     public int getHRes() {
@@ -106,23 +127,30 @@ public class FilePhoto extends Photo {
     }
 
     private Date findShotDate(final Metadata md) {
-
-        return null;
+        try {
+            return (Date)findDataInDirectoriesFor(_metFindShotDate, md);
+        } catch (NullPointerException e) {
+            LOG.log(Level.FINE, "{0} for {1}", new Object[]{e.getMessage(), absPath});
+            return null;
+        }
     }
 
     private String findCamera(final Metadata md) {
-        return null;
+        try {
+            return (String)findDataInDirectoriesFor(_metFindCamera, md);
+        } catch (NullPointerException e) {
+            LOG.log(Level.FINE, "{0} for {1}", new Object[]{e.getMessage(), absPath});
+            return null;
+        }
+        
     }
 
     private Point findResolution(final Metadata md) {
-        for (Class<? extends Directory> dir : directories) {
-            if (md.containsDirectory(dir)) {
-                try {
-                    return findResolutionInDir(md.getDirectory(dir));
-                } catch (NullPointerException e) {
-                    LOG.log(Level.FINEST, "{0} for {1}", new Object[]{e.getMessage(), absPath});
-                }
-            }
+
+        try {
+            return (Point)findDataInDirectoriesFor(_metFindResolution, md);
+        } catch (NullPointerException e) {
+            LOG.log(Level.FINE, "{0} for {1}", new Object[]{e.getMessage(), absPath});
         }
         try {
             BufferedImage read = ImageIO.read(new File(absPath));
@@ -145,6 +173,52 @@ public class FilePhoto extends Photo {
             }
         }
         throw new NullPointerException("Didn't find resolution in " + dir.getClass().getSimpleName());
+    }
+
+    private Date findShotDateInDir(final Directory dir) throws NullPointerException {
+        MetaDir md = MetaDir.getTagsFor(dir.getClass());
+        for (int i = 0; i < md.getDateTags().length; i++) {
+            int dateTag = md.getDateTags()[i];
+            return dir.getDate(dateTag);
+        }
+        throw new NullPointerException("Didn't find shot date in " + dir.getClass().getSimpleName());
+    }
+    
+    private String findCameraInDir(final Directory dir) throws NullPointerException {
+        MetaDir md = MetaDir.getTagsFor(dir.getClass());
+        for (int i = 0; i < md.getModelTags().length; i++) {
+            int modelTag = md.getModelTags()[i];
+            return dir.getString(modelTag);
+        }
+        throw new NullPointerException("Didn't find camera in " + dir.getClass().getSimpleName());
+    }
+    
+    private Object findDataInDirectoriesFor(Method m, Metadata md) {
+        Iterator<Class<? extends Directory>> dirIter = directories.iterator();
+        while (dirIter.hasNext()) {
+            Class<? extends Directory> dir = dirIter.next();
+            if (md.containsDirectory(dir)) {
+                try {
+                    Object retval = m.invoke(this, new Object[]{md.getDirectory(dir)});
+                    LOG.log(Level.FINEST, "Successfully retrieved data using {0} in {1} for {2}", 
+                            new Object[]{m.getName(), dir.getSimpleName(), absPath});
+                    return retval;
+                } catch (NullPointerException e) {
+                    LOG.log(Level.FINEST, "{0} for {1}", new Object[]{e.getMessage(), absPath});
+                } catch (IllegalAccessException | IllegalArgumentException ex) {
+                    LOG.log(Level.SEVERE, "Reflection error", ex);
+                    return null;
+                } catch(InvocationTargetException ite) {
+                    if(!(ite.getCause() instanceof NullPointerException)) {
+                        LOG.log(Level.SEVERE, "Unexpected exception thrown from reflected method", ite.getCause());
+                    }
+                }
+            } else {
+                dirIter.remove();
+                LOG.log(Level.FINEST, "Removing {0} from list of dirs for {1}", new Object[]{dir.getSimpleName(), absPath});
+            }
+        }
+        throw new NullPointerException("Didn't find data with method: " + m.getName());
     }
 
     private Matcher validateFileName(String absPath) throws FileNotFoundException {

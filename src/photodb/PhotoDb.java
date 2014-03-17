@@ -15,7 +15,7 @@ import photodb.processing.FolderScanner;
 public class PhotoDb {
 
     static {
-        final Level lvl = Level.FINEST;
+        final Level lvl = Level.FINER;
         Handler h = new ConsoleHandler();
         h.setLevel(lvl);
         h.setFormatter(new ConsoleFormatter());

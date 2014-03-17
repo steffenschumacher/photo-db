@@ -35,7 +35,7 @@ public class FolderScanner {
     }
 
     //</editor-fold>
-    private final static Pattern _patImage = Pattern.compile(".*\\.(jp(eg|g)|gif|arw)", Pattern.CASE_INSENSITIVE);
+    private final static Pattern _patImage = Pattern.compile(".*\\.(jp(eg|g)|arw)", Pattern.CASE_INSENSITIVE);
     private final static Logger LOG = Logger.getLogger(FolderScanner.class.getName());
     private static Integer photos = 0;
 

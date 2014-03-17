@@ -1,7 +1,10 @@
 package photodb.processing;
 
+import com.drew.imaging.ImageProcessingException;
+import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import photodb.photo.FilePhoto;
 
 /**
  * ScanPhotoTask - short description.
@@ -23,13 +26,13 @@ public class ScanPhotoTask implements Runnable {
     public void run() {
         
         try {
-            Thread.sleep(System.currentTimeMillis() %4000);
-        } catch (InterruptedException ex) {
-            LOG.log(Level.SEVERE, "Interrupted", ex);
+            FilePhoto fp = new FilePhoto(path);
+            LOG.log(Level.FINE, "Scanned {0}", fp.toString());
+        } catch (ImageProcessingException | IOException ex) {
+            LOG.log(Level.SEVERE, "Unhandled exception for " + path, ex);
         }
         synchronized(LOG) {
             processed++;
-            LOG.log(Level.FINE, "Would have scanned image at: {0}", path);
         }
     }
     
