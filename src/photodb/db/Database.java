@@ -104,6 +104,9 @@ public class Database {
     }
     
     public final Photo findByDate(Date d) {
+        if(d == null) {
+            return null;
+        }
         try {
             PreparedStatement select = connection.prepareStatement(_SqlSelect + " where shot = ?");
             select.setLong(1, d.getTime());

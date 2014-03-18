@@ -45,11 +45,11 @@ public class ScanPhotoTask implements Runnable {
         try {
             FilePhoto fp = new FilePhoto(path);
             LOG.log(Level.FINE, "Scanned {0}", fp.toString());
-            if(db.findByDate(fp.getShotDate()) == null) {
+            if(fp.getShotDate() != null && db.findByDate(fp.getShotDate()) == null) {
                 db.insert(fp);
                 LOG.log(Level.FINE, "Inserted {0} into the database", fp.toString());
-                String YYYY = String.valueOf(fp.getShotDate().getYear());
-                String mm = String.valueOf(fp.getShotDate().getMonth());
+                String YYYY = String.valueOf(fp.getShotDate().getYear()+1900);
+                String mm = String.valueOf(fp.getShotDate().getMonth()+1);
                 File monthDir = new File(store+"/" + YYYY+"/"+mm);
                 if(!monthDir.exists()) {
                     if(!monthDir.mkdirs()) {
