@@ -1,6 +1,10 @@
 package photodb.photo;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.Date;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Photo - short description.
@@ -10,6 +14,9 @@ import java.util.Date;
  * @version 1.0
  */
 public abstract class Photo {
+    // Find filename without absolute path, and separate extention.
+    private final static Pattern _patFile = Pattern.compile("^(.*[\\/\\\\]|)([^\\/^\\\\]+)\\.([^\\.]+)$");
+    
     public abstract int getHRes();
     public abstract int getVRes();
     public abstract Date getShotDate();
@@ -68,5 +75,8 @@ public abstract class Photo {
         return getVRes() > candidate.getVRes();
     }
     
-    
+        protected Matcher validateFileName(String absPath) throws FileNotFoundException {
+        Matcher m = _patFile.matcher(absPath);
+        return m;
+    }
 }

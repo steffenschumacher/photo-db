@@ -31,8 +31,7 @@ import javax.imageio.ImageIO;
 public class FilePhoto extends Photo {
 
     private final static Logger LOG = Logger.getLogger(FilePhoto.class.getName());
-    // Find filename without absolute path, and separate extention.
-    private final static Pattern _patFile = Pattern.compile("^(.*[\\/\\\\]|)([^\\/^\\\\]+)\\.([^\\.]+)$");
+    
     //<editor-fold defaultstate="collapsed" desc="static reflection methods for calling parameter-specific methods">
     private final static Method getDeclaredSearchMethod(String method) {
         try {
@@ -113,6 +112,10 @@ public class FilePhoto extends Photo {
     @Override
     public String getFileNameNoExtention() {
         return fileNameNoExtention;
+    }
+    
+    public String getAbsolutePath() {
+        return absPath;
     }
     //</editor-fold>
 
@@ -221,11 +224,12 @@ public class FilePhoto extends Photo {
         throw new NullPointerException("Didn't find data with method: " + m.getName());
     }
 
-    private Matcher validateFileName(String absPath) throws FileNotFoundException {
-
+    @Override
+    protected Matcher validateFileName(String absPath) throws FileNotFoundException {
+        
+        Matcher m = super.validateFileName(absPath);
         File f = new File(absPath);
-        Matcher m = _patFile.matcher(absPath);
-
+        
         if (!m.find()) {
             throw new FileNotFoundException("Unable to parse filenames from " + absPath);
         }
