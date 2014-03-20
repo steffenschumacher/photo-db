@@ -90,6 +90,28 @@ public class FilePhotoTest {
             fail("Unhandled exception: "+ex.getMessage() + ".");
         }
     }
+    
+    
+    /**
+     * Test of IMG_1127.jpg using class FilePhoto.
+     */
+    @Test
+    public void testp1010004() {
+        final String img = "p1010004.jpg";
+        System.out.println(img);
+        FilePhoto instance;
+        try {
+            dumpImg(img);
+            instance = new FilePhoto(folder + img);
+            assertEquals(2848, instance.getHRes());
+            assertEquals(4288, instance.getVRes());
+            assertEquals(new Date(1250338719000L), instance.getShotDate());
+            assertEquals("NIKON D300", instance.getCamera());
+        } catch (ImageProcessingException | IOException ex) {
+            LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
+            fail("Unhandled exception: "+ex.getMessage() + ".");
+        }
+    }
 
     public void dumpImg(String img) {
         FilePhoto instance;

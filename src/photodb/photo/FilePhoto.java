@@ -182,7 +182,10 @@ public class FilePhoto extends Photo {
         MetaDir md = MetaDir.getTagsFor(dir.getClass());
         for (int i = 0; i < md.getDateTags().length; i++) {
             int dateTag = md.getDateTags()[i];
-            return dir.getDate(dateTag);
+            Date d = dir.getDate(dateTag);
+            if(d!= null && d.after(new Date(10000000))) {
+                return d;
+            }
         }
         throw new NullPointerException("Didn't find shot date in " + dir.getClass().getSimpleName());
     }

@@ -7,6 +7,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.sql.SQLException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import photodb.db.Database;
@@ -48,9 +50,7 @@ public class ScanPhotoTask implements Runnable {
             if(fp.getShotDate() != null && db.findByDate(fp.getShotDate()) == null) {
                 db.insert(fp);
                 LOG.log(Level.FINE, "Inserted {0} into the database", fp.toString());
-                String YYYY = String.valueOf(fp.getShotDate().getYear()+1900);
-                String mm = String.valueOf(fp.getShotDate().getMonth()+1);
-                File monthDir = new File(store+"/" + YYYY+"/"+mm);
+                File monthDir = new File(store+getSubfolder(fp.getShotDate()));
                 if(!monthDir.exists()) {
                     if(!monthDir.mkdirs()) {
                         throw new IOException("Unable to create " + monthDir);
@@ -81,6 +81,11 @@ public class ScanPhotoTask implements Runnable {
         synchronized(LOG) {
             return processed;
         }
+    }
+    
+    private static String getSubfolder(Date shot) {
+        SimpleDateFormat sdf = new SimpleDateFormat("/yyyy/MM/");
+        return sdf.format(shot);
     }
     
     private static void copyFile(File sourceFile, File destFile)
