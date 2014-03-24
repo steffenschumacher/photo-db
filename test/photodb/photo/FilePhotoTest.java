@@ -105,7 +105,7 @@ public class FilePhotoTest {
             instance = new FilePhoto(folder + img);
             assertEquals(2848, instance.getHRes());
             assertEquals(4288, instance.getVRes());
-            assertEquals(new Date(1250338719000L), instance.getShotDate());
+            assertEquals(new Date(1250338719000L), instance.getDate());
             assertEquals("NIKON D300", instance.getCamera());
         } catch (ImageProcessingException | IOException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
@@ -113,9 +113,53 @@ public class FilePhotoTest {
         }
     }
 
+        
+    /**
+     * Test of IMG_1127.jpg using class FilePhoto.
+     */
+    @Test
+    public void test20131113_projektor() {
+        final String img = "20131113_projektor.jpg";
+        System.out.println(img);
+        FilePhoto instance;
+        try {
+            //FilePhoto.logMetaData(folder+ img);
+            instance = new FilePhoto(folder + img);
+            assertEquals(680, instance.getHRes());
+            assertEquals(932, instance.getVRes());
+            assertEquals(new Date(1392544345000L), instance.getDate());
+            assertEquals("CanoScan LiDE 210", instance.getCamera());
+        } catch (ImageProcessingException | IOException ex) {
+            LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
+            fail("Unhandled exception: "+ex.getMessage() + ".");
+        }
+    }
+            
+    /**
+     * Test of IMG_1127.jpg using class FilePhoto.
+     */
+    @Test
+    public void testmadrid001() {
+        final String img = "madrid001.jpg";
+        System.out.println(img);
+        FilePhoto instance;
+        try {
+            FilePhoto.logMetaData(folder+ img);
+            instance = new FilePhoto(folder + img);
+            assertEquals(680, instance.getHRes());
+            assertEquals(932, instance.getVRes());
+            assertEquals(new Date(1392544345000L), instance.getDate());
+            assertEquals("CanoScan LiDE 210", instance.getCamera());
+        } catch (ImageProcessingException | IOException ex) {
+            LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
+            fail("Unhandled exception: "+ex.getMessage() + ".");
+        }
+    }
+    
     public void dumpImg(String img) {
         FilePhoto instance;
         try {
+            FilePhoto.logMetaData(folder+ img);
             instance = new FilePhoto(folder + img);
             System.err.println(instance.getHRes() + "x" + instance.getVRes() + ",");
             System.err.println("D: " + instance.getShotDate() + ", " + instance.getShotDate().getTime() + ",");

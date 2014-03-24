@@ -23,8 +23,10 @@ public class Database {
 
     private final static Logger LOG = Logger.getLogger(Database.class.getName());
     private final static String _SqlInsert = "insert into picture(name, shot, vRes, hRes, camera) values(?,?,?,?,?)";
+    private final static String _SqlUpdName = "update picture set name = ? where shot = ? and camera = ?";
     private final static String _SqlSelect = "select name, shot, vRes, hRes, camera from picture";
-    private final static String _SqlDelete = "delete picture";
+    private final static String _SqlDelete = "delete from picture where shot = ? and camera = ?";
+
     static {
         try {
             // load the sqlite-JDBC driver using the current class loader
@@ -34,7 +36,6 @@ public class Database {
         }
     }
     Connection connection = null;
-    
 
     public Database(String path) throws SQLException {
 
@@ -56,7 +57,7 @@ public class Database {
         try {
             File db = new File(path);
             File dir = db.getParentFile();
-            if(!dir.exists()) {
+            if (!dir.exists()) {
                 dir.mkdirs();
             }
             // create a database connection
@@ -88,8 +89,8 @@ public class Database {
             LOG.log(Level.SEVERE, "Unexpected exception while closing db", e2);
         }
     }
-    
-    public final void insert(Photo p) {
+
+    public final void insert(Photo p) throws ExistingPhotoException {
         try {
             PreparedStatement insert = connection.prepareStatement(_SqlInsert);
             insert.setString(1, p.getFileName());
@@ -99,19 +100,63 @@ public class Database {
             insert.setString(5, p.getCamera());
             int inserted = insert.executeUpdate();
         } catch (SQLException ex) {
-            LOG.log(Level.SEVERE, "Unable to insert " + p.toString(), ex);
+            if (ex.getMessage().contains("columns shot, camera are not unique")) {
+                throw new ExistingPhotoException(findByDate(p.getShotDate()), p);
+            } else {
+                LOG.log(Level.SEVERE, "Unable to insert " + p.toString(), ex);
+            }
         }
     }
-    
+
+    /**
+     * update
+     *
+     * @param p Photo where shotDate must be set!!!!
+     */
+    public final void updateFileName(Photo p) {
+        try {
+            PreparedStatement update = connection.prepareStatement(_SqlUpdName);
+            update.setString(1, p.getFileName());
+            update.setLong(2, p.getShotDate().getTime());
+            update.setString(3, p.getCamera());
+            int updated = update.executeUpdate();
+            if (updated != 1) {
+                throw new SQLException("Error updating " + update.toString() + ", got " + updated + " updated?");
+            }
+        } catch (SQLException ex) {
+            LOG.log(Level.SEVERE, "Unable to insert " + p.toString(), ex);
+
+        }
+    }
+
+    /**
+     * update
+     *
+     * @param p Photo where shotDate must be set!!!!
+     */
+    public final void delete(Photo p) {
+        try {
+            PreparedStatement delete = connection.prepareStatement(_SqlDelete);
+            delete.setLong(1, p.getShotDate().getTime());
+            delete.setString(2, p.getCamera());
+            int deleted = delete.executeUpdate();
+            if (deleted > 1) {
+                throw new SQLException("Error deleting " + delete.toString() + ", got " + deleted + " deleted?");
+            }
+        } catch (SQLException ex) {
+            LOG.log(Level.SEVERE, "Unable to insert " + p.toString(), ex);
+
+        }
+    }
     public final Photo findByDate(Date d) {
-        if(d == null) {
+        if (d == null) {
             return null;
         }
         try {
             PreparedStatement select = connection.prepareStatement(_SqlSelect + " where shot = ?");
             select.setLong(1, d.getTime());
             ResultSet rs = select.executeQuery();
-            if(rs.next()) {
+            if (rs.next()) {
                 return parsePhoto(rs);
             }
         } catch (SQLException ex) {
@@ -119,14 +164,12 @@ public class Database {
         }
         return null;
     }
-    
-    
-    
+
     private final Photo parsePhoto(final ResultSet rsRow) throws SQLException {
-        return (Photo)new PhotoDbEntry(
-                rsRow.getString(1), 
-                new Date(rsRow.getLong(2)), 
-                rsRow.getInt(3), 
+        return (Photo) new PhotoDbEntry(
+                rsRow.getString(1),
+                new Date(rsRow.getLong(2)),
+                rsRow.getInt(3),
                 rsRow.getInt(4),
                 rsRow.getString(5));
     }
@@ -135,14 +178,14 @@ public class Database {
         try {
             Statement describe = connection.createStatement();
             ResultSet rs = describe.executeQuery("select name, shot, vRes, hRes, camera from picture");
-            while(rs.next()) {
+            while (rs.next()) {
                 Photo p = parsePhoto(rs);
                 LOG.log(Level.SEVERE, "Found: {0}", p);
             }
-            
+
         } catch (SQLException ex) {
             LOG.log(Level.SEVERE, "Unable to fetch schema for picture", ex);
         }
-        
+
     }
 }

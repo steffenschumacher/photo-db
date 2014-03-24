@@ -32,7 +32,7 @@ public class PhotoDb {
         
         final Logger LOG = Logger.getLogger("photodb");
         
-        final String searchPath = "/Users/ssch/Pictures";
+        final String searchPath = "/Volumes/HomeDisk/Billeder/"; ///Users/ssch/USBHD_Backup";
         LOG.log(Level.FINE, "test");
         FolderScanner fs = new FolderScanner(searchPath);
         while(!fs.awaitQueueTermination(3, TimeUnit.SECONDS)) {
