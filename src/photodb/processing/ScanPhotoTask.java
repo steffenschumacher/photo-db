@@ -3,6 +3,7 @@ package photodb.processing;
 import com.drew.imaging.ImageProcessingException;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -15,6 +16,7 @@ import photodb.db.Database;
 import photodb.db.ExistingPhotoException;
 import photodb.photo.FilePhoto;
 import photodb.photo.Photo;
+import photodb.photo.PhotoTooSmallException;
 
 /**
  * ScanPhotoTask - short description. Detailed description.
@@ -59,6 +61,9 @@ public class ScanPhotoTask implements Runnable {
                 //TODO: Store files in some way for future walkthrough..
                 LOG.log(Level.FINE, "Disregarding {0} because of missing date..", fp);
             }
+        } catch(PhotoTooSmallException | FileNotFoundException ex) {
+            LOG.log(Level.FINE, "Ignoring {0}: {1}", new Object[]{path, ex.getMessage()});
+                    
         } catch (ImageProcessingException | IOException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception for " + path, ex);
         } 

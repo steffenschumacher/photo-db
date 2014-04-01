@@ -58,14 +58,18 @@ public class FilePhoto extends Photo {
     protected final String absPath;
     protected ArrayList<Class<? extends Directory>> directories;
 
-    public FilePhoto(String absPath) throws FileNotFoundException, ImageProcessingException, IOException {
+    public FilePhoto(String absPath) throws FileNotFoundException, ImageProcessingException, IOException, PhotoTooSmallException {
         boolean failed = false;
         this.absPath = absPath;
 
         Matcher m = validateFileName(absPath);
+        
         fileNameNoExtention = m.group(2);
         fileName = fileNameNoExtention + "." + m.group(3);
         File f = new File(absPath);
+        if(f.length() < 200000) {
+            throw new PhotoTooSmallException("File is too small to be of interest");
+        }
         Metadata metadata = ImageMetadataReader.readMetadata(f);
         directories = MetaDir.getDirectories();
         Point res = findResolution(metadata);
@@ -82,7 +86,11 @@ public class FilePhoto extends Photo {
     }
 
     public static void logMetaData(String absPath) throws ImageProcessingException, IOException {
-        Metadata md = ImageMetadataReader.readMetadata(new File(absPath));
+        File f = new File(absPath);
+        if(f.length() < 200000) {
+            return; //Ignore files below 200k
+        }
+        Metadata md = ImageMetadataReader.readMetadata(f);
         for (Directory directory : md.getDirectories()) {
             for (Tag tag : directory.getTags()) {
                 LOG.log(Level.FINE, "In {0}:\t({1}){2}",
