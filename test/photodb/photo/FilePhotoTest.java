@@ -1,6 +1,7 @@
 package photodb.photo;
 
 import com.drew.imaging.ImageProcessingException;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Date;
 import java.util.logging.ConsoleHandler;
@@ -64,7 +65,7 @@ public class FilePhotoTest {
             assertEquals(2048, instance.getVRes());
             assertEquals(new Date(1117716280000L), instance.getShotDate());
             assertEquals("Canon DIGITAL IXUS 500", instance.getCamera());
-        } catch (ImageProcessingException | IOException ex) {
+        } catch (ImageProcessingException | IOException | PhotoTooSmallException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
             fail("Unhandled exception: "+ex.getMessage() + ".");
         }
@@ -85,7 +86,7 @@ public class FilePhotoTest {
             assertEquals(4288, instance.getVRes());
             assertEquals(new Date(1250338719000L), instance.getShotDate());
             assertEquals("NIKON D300", instance.getCamera());
-        } catch (ImageProcessingException | IOException ex) {
+        } catch (ImageProcessingException | IOException | PhotoTooSmallException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
             fail("Unhandled exception: "+ex.getMessage() + ".");
         }
@@ -107,7 +108,7 @@ public class FilePhotoTest {
             assertEquals(4288, instance.getVRes());
             assertEquals(new Date(1250338719000L), instance.getDate());
             assertEquals("NIKON D300", instance.getCamera());
-        } catch (ImageProcessingException | IOException ex) {
+        } catch (ImageProcessingException | IOException | PhotoTooSmallException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
             fail("Unhandled exception: "+ex.getMessage() + ".");
         }
@@ -129,7 +130,7 @@ public class FilePhotoTest {
             assertEquals(932, instance.getVRes());
             assertEquals(new Date(1392544345000L), instance.getDate());
             assertEquals("CanoScan LiDE 210", instance.getCamera());
-        } catch (ImageProcessingException | IOException ex) {
+        } catch (ImageProcessingException | IOException | PhotoTooSmallException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
             fail("Unhandled exception: "+ex.getMessage() + ".");
         }
@@ -150,9 +151,28 @@ public class FilePhotoTest {
             assertEquals(932, instance.getVRes());
             assertEquals(new Date(1392544345000L), instance.getDate());
             assertEquals("CanoScan LiDE 210", instance.getCamera());
+        } catch (ImageProcessingException | IOException | PhotoTooSmallException ex) {
+            LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
+            fail("Unhandled exception: "+ex.getMessage() + ".");
+        }
+    }
+    
+    @Test
+    public void testErrorHandling() {
+        final String img = "/Volumes/HomeDisk/Billeder/Bryllup/Bryllupsrejsen/._IMG_1717.JPG";
+        FilePhoto instance;
+        try {
+            //FilePhoto.logMetaData(img);
+            instance = new FilePhoto(img);
+            assertEquals(680, instance.getHRes());
+            assertEquals(932, instance.getVRes());
+            assertEquals(new Date(1392544345000L), instance.getDate());
+            assertEquals("CanoScan LiDE 210", instance.getCamera());
         } catch (ImageProcessingException | IOException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
             fail("Unhandled exception: "+ex.getMessage() + ".");
+        } catch (PhotoTooSmallException ex) {
+            Logger.getLogger(FilePhotoTest.class.getName()).log(Level.INFO, ex.getMessage());
         }
     }
     
@@ -167,6 +187,8 @@ public class FilePhotoTest {
         } catch (ImageProcessingException | IOException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
             fail("Unhandled exception: "+ex.getMessage() + ".");
+        } catch (PhotoTooSmallException ex) {
+            Logger.getLogger(FilePhotoTest.class.getName()).log(Level.SEVERE, ex.getLocalizedMessage());
         }
     }
 }
