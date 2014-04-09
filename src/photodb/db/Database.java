@@ -177,7 +177,7 @@ public class Database {
         return null;
     }
 
-    private final Photo parsePhoto(final ResultSet rsRow) throws SQLException {
+    private Photo parsePhoto(final ResultSet rsRow) throws SQLException {
         return (Photo) new PhotoDbEntry(
                 rsRow.getString(1),
                 new Date(rsRow.getLong(2)),
