@@ -6,6 +6,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.logging.Level;
+import org.apache.commons.cli.CommandLine;
 
 /**
  *
@@ -57,13 +59,14 @@ public class NotInitializedException extends Exception {
      * @throws FileNotFoundException
      * @throws IOException 
      */
-    public void initializeConfig(String proportiesFile) throws FileNotFoundException, IOException {
+    public Config initializeConfig(String proportiesFile) throws FileNotFoundException, IOException {
         File f = new File(proportiesFile);
         if(f.isFile() && f.canRead()) {
             InputStream input = new FileInputStream(f);
             Config instance = new Config(input);
             instance.setConfigFile(proportiesFile);
             ch.instantiateConfig(instance);
+            return instance;
         } else {
             throw new FileNotFoundException("Unable to read file: " + f);
         }
@@ -71,10 +74,47 @@ public class NotInitializedException extends Exception {
     /**
      * initializeConfig initializes config to provided object
      * @param c 
-     * @throws java.io.IOException if we cannot store the properties file
      */
-    public void initializeConfig(Config c) throws IOException {
+    public void initializeConfig(Config c) {
         ch.instantiateConfig(c);
+    }
+    
+    public Config initializeConfig(String path, CommandLine cl) {
+        Config c = Config.createFromArgs(path, cl);
+        ch.instantiateConfig(c);
+        return c;
+    }
+    
+    /**
+     * provideCommandLineArgs
+     * @param c
+     * @param cl 
+     */
+    public void provideCommandLineArgs(Config c, CommandLine cl) {
+        if(cl.hasOption("m")) {
+            c.setMinPicSize(Long.parseLong(cl.getOptionValue("m")));
+        }
+        if(cl.hasOption("d")) {
+            c.setLogLevel(Level.parse(cl.getOptionValue("d")));
+        }
+    }
+    /**
+     * storeConfig
+     * @param c
+     * @throws IOException 
+     */
+    public void storeConfig(Config c) throws IOException {
+        /*
+                File rootDir = new File(root);
+        if(!rootDir.exists()) {
+            rootDir.mkdirs();
+        } else if(!rootDir.isDirectory()) {
+            throw new IllegalArgumentException("The folder " + root + " already exists, and isn't a folder");
+        } else if(!rootDir.canWrite() || !rootDir.canRead()) {
+            throw new IOException("The folder " + root + " has insufficient permissions");
+        }
+        //Ok, so now the root dir is established..
+        */
         File newPropertiesFile = new File(c.getConfigFile());
         FileOutputStream fos = new FileOutputStream(newPropertiesFile);
         c.storeTo(fos);

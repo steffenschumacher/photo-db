@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.commons.cli.CommandLine;
 
 /**
  *
@@ -19,6 +20,8 @@ import java.util.logging.Logger;
 public class Config {
 
     private static ConfigHolder h = new ConfigHolder();
+    private static long _defMinPicSize = 150000L;
+    private static Level _defLogSize = Level.INFO;
     private String libPath;
     private final ArrayList<String> scanners = new ArrayList<>();
     private long minPicSize;
@@ -31,13 +34,20 @@ public class Config {
 
     public Config(String libPath, String[] scanners, long minPicSize, Level logLevel) {
         this.libPath = libPath;
-        this.configFile = libPath + 
-                (libPath.endsWith(File.separator) ? "" : File.separator) + 
-                ".config";
+        this.configFile = deriveConfigFileFromPath(libPath);
         this.scanners.addAll(Arrays.asList(scanners));
         this.minPicSize = minPicSize;
         this.logLevel = logLevel;
     }
+
+    protected static Config createFromArgs(String root, CommandLine cl) {
+        long picsize = Long.parseLong(cl.getOptionValue("m", String.valueOf(_defMinPicSize)));
+        Level logsize = Level.parse(cl.getOptionValue("d", _defLogSize.getName()));
+        return new Config(root, new String[]{}, picsize, logsize);
+    }
+    
+    
+    
 
     public String getConfigFile() {
         
@@ -163,5 +173,9 @@ public class Config {
         return hash;
     }
     
+    public static final String deriveConfigFileFromPath(String path) {
+        return path + (path.endsWith(File.separator) ? "" : File.separator) + 
+                ".config";
+    }
     
 }
