@@ -176,6 +176,23 @@ public class FilePhotoTest {
         }
     }
     
+    @Test
+    public void testMissingTags() {
+        final String img = "/Volumes/HomeDisk/Billeder/Bryllup/Bryllupsrejsen/IMG_1782.JPG";
+        FilePhoto instance;
+        try {
+            FilePhoto.logMetaData(img);
+            instance = new FilePhoto(img);
+            assertEquals(1200, instance.getHRes());
+            assertEquals(932, instance.getVRes());
+            assertEquals(new Date(1392544345000L), instance.getDate());
+            assertEquals("CanoScan LiDE 210", instance.getCamera());
+        } catch (ImageProcessingException | IOException | PhotoTooSmallException ex) {
+            LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
+            fail("Unhandled exception: "+ex.getMessage() + ".");
+        }
+    }
+    
     public void dumpImg(String img) {
         FilePhoto instance;
         try {
