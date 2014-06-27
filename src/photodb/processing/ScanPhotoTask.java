@@ -72,22 +72,22 @@ public class ScanPhotoTask implements Runnable {
         }
     }
 
-    protected void insert(FilePhoto fp) throws ExistingPhotoException, IOException {
-        db.insert(fp);
-        LOG.log(Level.FINE, "Inserted {0} into the database", fp.toString());
-        File monthDir = getFileLocation(fp);
-        if (!monthDir.exists()) {
-            if (!monthDir.mkdirs()) {
-                throw new IOException("Unable to create " + monthDir);
-            } else {
-                LOG.log(Level.FINE, "created dir {0}", monthDir.getPath());
+        protected void insert(FilePhoto fp) throws ExistingPhotoException, IOException {
+            db.insert(fp);
+            LOG.log(Level.FINE, "Inserted {0} into the database", fp.toString());
+            File monthDir = getFileLocation(fp);
+            if (!monthDir.exists()) {
+                if (!monthDir.mkdirs()) {
+                    throw new IOException("Unable to create " + monthDir);
+                } else {
+                    LOG.log(Level.FINE, "created dir {0}", monthDir.getPath());
+                }
             }
+            File dest = new File(monthDir.getAbsolutePath() + "/" + fp.getFileName().toLowerCase());
+            copyFile(new File(fp.getAbsolutePath()), dest);
+            dest.setLastModified(fp.getShotDate().getTime());
+            LOG.log(Level.FINE, "Copied file to {0}", monthDir.getPath());
         }
-        File dest = new File(monthDir.getAbsolutePath() + "/" + fp.getFileName().toLowerCase());
-        copyFile(new File(fp.getAbsolutePath()), dest);
-        dest.setLastModified(fp.getShotDate().getTime());
-        LOG.log(Level.FINE, "Copied file to {0}", monthDir.getPath());
-    }
     
     protected File getFileLocation(Photo fp) {
         return new File(store + getSubfolder(fp.getShotDate()));

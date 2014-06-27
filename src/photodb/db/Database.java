@@ -38,12 +38,23 @@ public class Database {
     Connection connection = null;
 
     public Database(String path) throws SQLException {
-
-        File f = new File(path);
-        if (f.isFile() && f.canRead() && f.canWrite()) {
-            initExistingDatabase(path);
-        } else if (!f.exists()) {
-            initNewDatabase(path);
+        try {
+            File f = new File(path);
+            if (f.isFile() && f.canRead() && f.canWrite()) {
+                LOG.log(Level.FINE, "Attempting to initialize existing database");
+                initExistingDatabase(path);
+            } else if (!f.exists()) {
+                LOG.log(Level.FINE, "Attempting to initialize new database");
+                initNewDatabase(path);
+            } else {
+                LOG.log(Level.SEVERE, 
+                        "Unable to open database at {0}. isFile:{1}, canRead:{2}, canWrite:{3}, exists:{4}",
+                        new Object[]{path, f.isFile(), f.canRead(), f.canWrite(), f.exists()});
+            }
+            LOG.log(Level.FINE, "Database initialized");
+                
+        } catch (Exception e) {
+            LOG.log(Level.SEVERE, "Unexpected exception while initing new db", e);
         }
 
     }
@@ -148,6 +159,7 @@ public class Database {
 
         }
     }
+
     public final Photo findByDate(Date d) {
         if (d == null) {
             return null;
