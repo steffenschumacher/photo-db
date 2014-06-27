@@ -23,7 +23,7 @@ public class ExistingPhotoException extends SQLException {
                 attempted.getFileName().toLowerCase().startsWith("img_"));
     }
 
-    public Photo getBlocking() {
+    public Photo getBlockingPhoto() {
         return blocking;
     }
 
