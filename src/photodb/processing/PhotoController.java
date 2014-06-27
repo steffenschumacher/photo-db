@@ -24,6 +24,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.logging.Level;
@@ -51,9 +52,42 @@ public class PhotoController {
         this.db = db;
     }
 
+    public PhotoController(final String store) throws SQLException {
+        this.store = store;
+        this.db = new Database(store + "/photo.db");
+    }
+    
+    protected boolean exists(FilePhoto filephoto) {
+        try {
+            db.insert(filephoto);
+            db.delete(filephoto);
+            return false;
+        } catch (ExistingPhotoException e) {
+            return true;
+        }
+    }
+
     protected void insert(FilePhoto fp) throws ExistingPhotoException, IOException {
+        File sourceFile = new File(fp.getAbsolutePath());
+        if (sourceFile.exists()) {
+            FileChannel source = new FileInputStream(sourceFile).getChannel();
+            insert(fp, source);
+            if (source != null) {
+                source.close();
+            }
+        }        
+    }
+    
+    protected void insert(FilePhoto fp, FileChannel source) throws ExistingPhotoException, IOException {
         db.insert(fp);
         LOG.log(Level.FINE, "Inserted {0} into the database", fp.toString());
+        File dest = establishDestinationPath(fp);
+        copyChannel(source, dest);
+        dest.setLastModified(fp.getShotDate().getTime());
+        LOG.log(Level.FINE, "Copied file to {0}", dest.getPath());
+    }
+
+    protected File establishDestinationPath(FilePhoto fp) throws IOException {
         File monthDir = getFileLocation(fp);
         if (!monthDir.exists()) {
             if (!monthDir.mkdirs()) {
@@ -63,9 +97,7 @@ public class PhotoController {
             }
         }
         File dest = new File(monthDir.getAbsolutePath() + "/" + fp.getFileName().toLowerCase());
-        copyFile(new File(fp.getAbsolutePath()), dest);
-        dest.setLastModified(fp.getShotDate().getTime());
-        LOG.log(Level.FINE, "Copied file to {0}", monthDir.getPath());
+        return dest;
     }
 
     protected File getFileLocation(Photo fp) {
@@ -84,31 +116,22 @@ public class PhotoController {
         }
     }
 
-    private static String getSubfolder(Date shot) {
+    private String getSubfolder(Date shot) {
         SimpleDateFormat sdf = new SimpleDateFormat("/yyyy/MM/");
         return sdf.format(shot);
     }
 
-    private static void copyFile(File sourceFile, File destFile)
-            throws IOException {
-        if (!sourceFile.exists()) {
-            return;
-        }
+    private void copyChannel(FileChannel source, File destFile) throws IOException {
         if (!destFile.exists()) {
             destFile.createNewFile();
         }
-        FileChannel source = new FileInputStream(sourceFile).getChannel();
         FileChannel destination = new FileOutputStream(destFile).getChannel();
         if (destination != null && source != null) {
             destination.transferFrom(source, 0, source.size());
         }
-        if (source != null) {
-            source.close();
-        }
         if (destination != null) {
             destination.close();
         }
-
     }
 
 }
