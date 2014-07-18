@@ -54,10 +54,14 @@ public class PhotoController {
 
     public PhotoController(final String store) throws SQLException {
         this.store = store;
-        this.db = new Database(store + "/photo.db");
+        this.db = initDb(store);
     }
     
-    protected boolean exists(FilePhoto filephoto) {
+    protected static Database initDb(String store) throws SQLException {
+        return new Database(store + "/photo.db");
+    }
+    
+    public boolean exists(Photo filephoto) {
         try {
             db.insert(filephoto);
             db.delete(filephoto);
@@ -66,8 +70,20 @@ public class PhotoController {
             return true;
         }
     }
+    
+    public boolean isDesired(Photo filephoto) {
+        try {
+            db.insert(filephoto);
+            db.delete(filephoto);
+            return true;
+        } catch (ExistingPhotoException e) {
+            return e.isToBeReplaced();
+        }
+    }
+    
+    
 
-    protected void insert(FilePhoto fp) throws ExistingPhotoException, IOException {
+    public void insert(FilePhoto fp) throws ExistingPhotoException, IOException {
         File sourceFile = new File(fp.getAbsolutePath());
         if (sourceFile.exists()) {
             FileChannel source = new FileInputStream(sourceFile).getChannel();
@@ -78,7 +94,7 @@ public class PhotoController {
         }        
     }
     
-    protected void insert(FilePhoto fp, FileChannel source) throws ExistingPhotoException, IOException {
+    public void insert(Photo fp, FileChannel source) throws ExistingPhotoException, IOException {
         db.insert(fp);
         LOG.log(Level.FINE, "Inserted {0} into the database", fp.toString());
         File dest = establishDestinationPath(fp);
@@ -87,7 +103,7 @@ public class PhotoController {
         LOG.log(Level.FINE, "Copied file to {0}", dest.getPath());
     }
 
-    protected File establishDestinationPath(FilePhoto fp) throws IOException {
+    public File establishDestinationPath(Photo fp) throws IOException {
         File monthDir = getFileLocation(fp);
         if (!monthDir.exists()) {
             if (!monthDir.mkdirs()) {
@@ -96,7 +112,7 @@ public class PhotoController {
                 LOG.log(Level.FINE, "created dir {0}", monthDir.getPath());
             }
         }
-        File dest = new File(monthDir.getAbsolutePath() + "/" + fp.getFileName().toLowerCase());
+        File dest = new File(monthDir.getAbsolutePath() + "/" + fp.getFileName());
         return dest;
     }
 
@@ -134,4 +150,9 @@ public class PhotoController {
         }
     }
 
+    public void close() {
+        if(db != null) {
+            db.close();
+        }
+    }
 }

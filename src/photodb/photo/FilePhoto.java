@@ -19,7 +19,6 @@ import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
 
 /**
@@ -48,14 +47,14 @@ public class FilePhoto extends Photo {
     private final static Method _metFindCamera = getDeclaredSearchMethod("findCameraInDir");
 
     //</editor-fold>
-    protected final int vRes;
-    protected final int hRes;
-    protected final Date shotDate;
-    protected final String camera;
-    protected final String fileName;
-    protected final String fileNameNoExtention;
-    protected final Date fileDate;
-    protected final String absPath;
+    protected int vRes;
+    protected int hRes;
+    protected Date shotDate;
+    protected String camera;
+    protected String fileName;
+    protected String fileNameNoExtention;
+    protected Date fileDate;
+    protected String absPath;
     protected ArrayList<Class<? extends Directory>> directories;
 
     public FilePhoto(String absPath) throws FileNotFoundException, ImageProcessingException, IOException, PhotoTooSmallException {
@@ -63,11 +62,11 @@ public class FilePhoto extends Photo {
         this.absPath = absPath;
 
         Matcher m = validateFileName(absPath);
-        
+
         fileNameNoExtention = m.group(2);
         fileName = fileNameNoExtention + "." + m.group(3);
         File f = new File(absPath);
-        if(f.length() < 200000) {
+        if (f.length() < 200000) {
             throw new PhotoTooSmallException("File is too small to be of interest");
         }
         Metadata metadata = ImageMetadataReader.readMetadata(f);
@@ -87,7 +86,7 @@ public class FilePhoto extends Photo {
 
     public static void logMetaData(String absPath) throws ImageProcessingException, IOException {
         File f = new File(absPath);
-        if(f.length() < 200000) {
+        if (f.length() < 200000) {
             return; //Ignore files below 200k
         }
         Metadata md = ImageMetadataReader.readMetadata(f);
@@ -146,7 +145,7 @@ public class FilePhoto extends Photo {
         }
     }
     //</editor-fold>
-
+    
     //<editor-fold defaultstate="collapsed" desc="Helper methods for parsing metadata">
     private Date findShotDate(final Metadata md) {
         try {

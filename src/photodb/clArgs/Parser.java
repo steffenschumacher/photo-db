@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.lang.management.ManagementFactory;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.commons.cli.CommandLine;
@@ -29,33 +31,34 @@ public class Parser {
         _opts.addOption(OptionBuilder.withArgName("p")
                 .withDescription("Path to where root of the storage/destination folder")
                 .hasArg()
-                .isRequired(true)
-                .withArgName("Destination-path")
-                .create());
+                .isRequired(false)
+                .withLongOpt("Destination-path")
+                .create("p"));
         _opts.addOption(OptionBuilder.withArgName("d")
                 .withDescription("Loglevel [OFF|INFO|FINE|FINER|FINEST]")
                 .hasArg()
                 .isRequired(false)
-                .withArgName("Level")
-                .create());
+                .withLongOpt("Level")
+                .create("l"));
         _opts.addOption(OptionBuilder.withArgName("m")
                 .withDescription("Minimum picturesize in kilobytes")
                 .hasArg()
                 .isRequired(false)
-                .withArgName("KBs")
-                .create());
+                .withLongOpt("KBs")
+                .create("m"));
         _opts.addOption(OptionBuilder.withArgName("s")
                 .withDescription("Source folder to scan for images")
                 .hasArg()
                 .isRequired(true)
-                .withArgName("Source-path")
-                .create());
+                .withLongOpt("Source-path")
+                .create("s"));
     }
     //</editor-fold>
 
     private static void printHelp(PrintStream out, final String args[]) {
         HelpFormatter formatter = new HelpFormatter();
-        formatter.printHelp(args[0], _opts);
+        String commandline = "java -jar [path to jar]";
+        formatter.printHelp(commandline, _opts);
     }
 
     public static String parseArguments(String args[]) throws IOException {
@@ -63,8 +66,10 @@ public class Parser {
         try {
             CommandLine cl = clp.parse(_opts, args, true);
             parseArguments(cl);
-            return "source folder!!";
+            //Source dir to be scanned, w/o trailing dir sep
+            return cl.getOptionValue("s", ".").replace("[\\/]*$", ""); 
         } catch (ParseException ex) {
+            System.err.println(ex.getMessage());
             printHelp(System.out, args);
             System.exit(0);
         }
@@ -72,8 +77,7 @@ public class Parser {
     }
 
     private static void parseArguments(CommandLine cl) throws IOException {
-        String root = cl.getOptionValue("p");
-        String searchPath = "1";
+        String root = cl.getOptionValue("p", System.getProperty("user.home")).replace("[\\/]*$", "");
         Config c = null;
         try {
             Config.getInstance();

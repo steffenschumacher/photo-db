@@ -97,6 +97,9 @@ public class NotInitializedException extends Exception {
         if(cl.hasOption("d")) {
             c.setLogLevel(Level.parse(cl.getOptionValue("d")));
         }
+        if(cl.hasOption("w")) {
+            c.setWsUrl(cl.getOptionValue("w"));
+        }
     }
     /**
      * storeConfig
@@ -116,6 +119,12 @@ public class NotInitializedException extends Exception {
         //Ok, so now the root dir is established..
         */
         File newPropertiesFile = new File(c.getConfigFile());
+        if(!newPropertiesFile.exists()) {
+            newPropertiesFile.createNewFile();
+        } 
+        if(!newPropertiesFile.canWrite()) {
+            throw new FileNotFoundException("Unable to write to file " + newPropertiesFile.getAbsolutePath());
+        }
         FileOutputStream fos = new FileOutputStream(newPropertiesFile);
         c.storeTo(fos);
     }

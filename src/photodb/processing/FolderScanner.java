@@ -54,7 +54,7 @@ public class FolderScanner {
     public FolderScanner(String path) {
         this(path, null);
         queuePhotoJobs();
-        while (!ScanFolderTask.waitForAllFoldersScanned(1, TimeUnit.SECONDS)) {
+        while (!ScanFolderTask.waitForAllFoldersScanned(10, TimeUnit.SECONDS)) {
             LOG.log(Level.FINE,
                     "Waiting for all subfolder/photos to be queued, Photos (found/processed): {0}/{1}",
                     new Object[]{getPhotoCount(), getProcessedCount()});

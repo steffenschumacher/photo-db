@@ -26,6 +26,7 @@ public class Config {
     private final ArrayList<String> scanners = new ArrayList<>();
     private long minPicSize;
     private Level logLevel;
+    private String wsUrl;
     private String configFile;
 
     public static Config getInstance() throws NotInitializedException {
@@ -39,11 +40,23 @@ public class Config {
         this.minPicSize = minPicSize;
         this.logLevel = logLevel;
     }
+    
+    public Config(String libPath) {
+        this(libPath, new String[]{}, _defMinPicSize, _defLogSize);
+    }
 
     protected static Config createFromArgs(String root, CommandLine cl) {
         long picsize = Long.parseLong(cl.getOptionValue("m", String.valueOf(_defMinPicSize)));
         Level logsize = Level.parse(cl.getOptionValue("d", _defLogSize.getName()));
-        return new Config(root, new String[]{}, picsize, logsize);
+        Config c = new Config(root, new String[]{}, picsize, logsize);
+        if(cl.hasOption("w")) {
+            String wsUrl = cl.getOptionValue("w", null);
+            if(wsUrl != null && wsUrl.equalsIgnoreCase("null")) {
+                wsUrl = null;
+            }
+            c.setWsUrl(wsUrl);
+        }
+        return c;
     }
     
     
@@ -85,6 +98,14 @@ public class Config {
     public void setLogLevel(Level logLevel) {
         this.logLevel = logLevel;
     }
+
+    public String getWsUrl() {
+        return wsUrl;
+    }
+
+    public void setWsUrl(String wsUrl) {
+        this.wsUrl = wsUrl;
+    }
     
     
 
@@ -115,11 +136,16 @@ public class Config {
                 long val = Long.parseLong(pMinPicSize);
                 this.minPicSize = val;
             }
+            final String pWsUrl = prop.getProperty("wsurl");
+            if(pWsUrl != null) {
+                this.wsUrl = pWsUrl;
+            }
             final String pScannersList = prop.getProperty("scanners");
             if(pScannersList != null && !pScannersList.isEmpty()) {
                 String[] pScanners = pScannersList.split("#");
                 scanners.addAll(Arrays.asList(pScanners));
             }
+            
         } finally {
             if (propertiesFile != null) {
                 try {
@@ -137,6 +163,9 @@ public class Config {
         prop.setProperty("librarypath", libPath);
         prop.setProperty("loglevel", logLevel.getName());
         prop.setProperty("minpicsize", String.valueOf(minPicSize));
+        if(wsUrl != null) {
+            prop.setProperty("wsurl", wsUrl);
+        }
         final StringBuilder scannersSB = new StringBuilder();
         for(String sc : getScanners()) {
             if(scannersSB.length() > 0) {
@@ -156,6 +185,7 @@ public class Config {
                     cObj.libPath.equals(libPath) &&
                     cObj.logLevel.equals(logLevel) && 
                     cObj.minPicSize == minPicSize &&
+                    cObj.wsUrl.equals(wsUrl) &&
                     cObj.scanners.equals(scanners));
         } else {
             return super.equals(obj);
@@ -169,13 +199,14 @@ public class Config {
         hash = 41 * hash + Objects.hashCode(this.scanners);
         hash = 41 * hash + (int) (this.minPicSize ^ (this.minPicSize >>> 32));
         hash = 41 * hash + Objects.hashCode(this.logLevel);
+        hash = 41 * hash + Objects.hashCode(this.wsUrl);
         hash = 41 * hash + Objects.hashCode(this.configFile);
         return hash;
     }
     
     public static final String deriveConfigFileFromPath(String path) {
         return path + (path.endsWith(File.separator) ? "" : File.separator) + 
-                ".config";
+                ".photodb.config";
     }
     
 }
