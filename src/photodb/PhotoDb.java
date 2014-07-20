@@ -44,7 +44,7 @@ public class PhotoDb {
                 Config.getInstance().setWsUrl("http://localhost:8084/PhotoDbWS/PhotoDBWS");
             }
             if(Config.getInstance().getWsUrl() != null) {
-                ScanPhotoTask.initForRemoteDb(Config.getInstance().getWsUrl());
+                ScanPhotoTask.initForRemoteDb();
             }
             
         } catch (IOException ex) {

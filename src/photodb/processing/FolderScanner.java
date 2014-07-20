@@ -30,7 +30,7 @@ public class FolderScanner {
 
     private synchronized static void initQueue() {
         if (_QUEUE == null) {
-            _QUEUE = Executors.newFixedThreadPool(5);
+            _QUEUE = Executors.newFixedThreadPool(10);
         }
     }
 
