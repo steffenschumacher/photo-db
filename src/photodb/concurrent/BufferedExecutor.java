@@ -80,6 +80,7 @@ public abstract class BufferedExecutor<INPUT extends Object, OUTPUT extends Obje
     private final int jobHoldTimeMs;
     private final Semaphore availableCapacity;
     private final Semaphore isFull = new Semaphore(0);
+    private final Semaphore isRunning = new Semaphore(1);
     private final List<Job> jobQueue = new ArrayList<>();
     private final HashMap<INPUT, Job> jobMap = new HashMap<>();
 
@@ -127,17 +128,26 @@ public abstract class BufferedExecutor<INPUT extends Object, OUTPUT extends Obje
     }
 
     /**
+     * Terminate the BufferedExecutor, by draining the semaphore.
+     * 
+     */
+    public final void terminate() {
+        isRunning.drainPermits();
+    }
+    
+    /**
      * Run loop..
      */
     @Override
     public void run() {
         try {
-            while (true) {
+            while (isRunning.availablePermits() > 0) {
                 waitAndExecuteOnBufferedJobs();
             }
         } catch (InterruptedException e) {
             //Execution is likely done..
         }
+        LOG.log(Level.FINER, "Cleaning up {0}", this.getClass().getSimpleName());
 
     }
 
@@ -159,7 +169,7 @@ public abstract class BufferedExecutor<INPUT extends Object, OUTPUT extends Obje
         performHouseKeeping();
         if (jobMap.isEmpty()) {
             //No need to continue
-            LOG.log(Level.FINE,
+            LOG.log(Level.FINER,
                     "{0} didn't receive any jobs for {1} ms - skipping execution",
                     new Object[]{this.getClass().getName(), jobHoldTimeMs});
         } else {

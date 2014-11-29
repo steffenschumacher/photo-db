@@ -24,6 +24,7 @@ public class PhotoDb {
         Handler h = new ConsoleHandler();
         h.setLevel(lvl);
         h.setFormatter(new ConsoleFormatter());
+        Logger.getLogger("photodb").setUseParentHandlers(false);
         Logger.getLogger("photodb").setLevel(lvl);
         Logger.getLogger("photodb").addHandler(h);
     }
@@ -38,20 +39,25 @@ public class PhotoDb {
         final String searchPath;
         try {
             searchPath = Parser.parseArguments(args);
-            Config.getInstance().setLogLevel(LOG.getLevel());
-            if(Config.getInstance().getWsUrl() == null) {
-                //Config.getInstance().setWsUrl("http://ec2-54-187-142-183.us-west-2.compute.amazonaws.com:8080/PhotoDbWS/PhotoDBWS");
-                Config.getInstance().setWsUrl("http://localhost:8084/PhotoDbWS/PhotoDBWS");
+            for(Handler h : LOG.getHandlers()) {
+                h.setLevel(Config.getInstance().getLogLevel());
             }
+            LOG.setLevel(Config.getInstance().getLogLevel());
             if(Config.getInstance().getWsUrl() != null) {
                 ScanPhotoTask.initForRemoteDb();
+            } else {
+                ScanPhotoTask.initForLocalDb(Config.getInstance().getLibPath());
             }
+            
             
         } catch (IOException ex) {
             LOG.log(Level.SEVERE, "Exception parsing arguments?", ex);
             return;
         } catch (NotInitializedException ex) {
             LOG.log(Level.SEVERE, "Config not initialized??", ex);
+            return;
+        } catch (Exception ex) {
+            LOG.log(Level.SEVERE, null, ex);
             return;
         }
         LOG.log(Level.FINE, "test");
@@ -66,7 +72,7 @@ public class PhotoDb {
         LOG.log(Level.FINE, 
                     "Done with all photos to be processed (found/processed): {0}/{1}", 
                     new Object[]{FolderScanner.getPhotoCount(), FolderScanner.getProcessedCount()});
-        
+        ScanPhotoTask.cleanup();
     }
     
     

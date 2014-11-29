@@ -7,10 +7,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.SQLException;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.xml.datatype.DatatypeConfigurationException;
@@ -19,7 +17,7 @@ import photodb.db.ExistingPhotoException;
 import photodb.photo.FilePhoto;
 import photodb.photo.PhotoTooSmallException;
 import photodb.wsclient.ExistingPhotoWSException;
-import photodb.wsclient.SoapPhoto;
+import photodb.photo.SoapPhoto;
 
 /**
  * ScanPhotoTask - short description. Detailed description.
@@ -36,6 +34,7 @@ public class ScanPhotoTask extends PhotoController implements Runnable {
     private static boolean isLocal;
 
     public static void initForLocalDb(String store) {
+        LOG.log(Level.FINE, "Setting up shop locally");
         if (store == null) {
             s_store = "/Users/ssch/PhotoDb";
         } else {
@@ -49,7 +48,8 @@ public class ScanPhotoTask extends PhotoController implements Runnable {
         }
     }
 
-    public static void initForRemoteDb() {
+    public static void initForRemoteDb() throws Exception {
+        LOG.log(Level.INFO, "Setting up shop for remote db..");
         s_store = System.getProperty("java.io.tmpdir") + File.pathSeparator
                 + "tmp-photodb-" + System.currentTimeMillis() + ".db";
         try {
@@ -70,6 +70,7 @@ public class ScanPhotoTask extends PhotoController implements Runnable {
         s_db.close();
         File tmpDb = new File(s_store);
         tmpDb.deleteOnExit();
+        UploadEligibilityChecker.getInstance().terminate();
     }
 
     private static Integer processed = 0;
@@ -116,14 +117,20 @@ public class ScanPhotoTask extends PhotoController implements Runnable {
     @Override
     public void insert(FilePhoto fp) throws ExistingPhotoException, IOException {
         if (isLocal) {
-            super.insert(fp);
+            if (super.isDesired(fp)) {
+                super.insert(fp);
+                LOG.log(Level.INFO, "Stored {0}", new Object[]{fp.toString()});
+            } else {
+                LOG.log(Level.INFO, "Ignoring {0} as it is a duplicate of a photo already stored", fp.toString());
+            }
+
         } else {
 
-            SoapPhoto sp = toSoapPhoto(fp);
-            if(!isUploadEligible(fp)) { 
-                LOG.log(Level.INFO, "Ingoring {0} as it is a duplicate of a photo already processed in this scan", fp.toString());
-            } else if (!UploadEligibilityChecker.getInstance().check(sp)) {
-                LOG.log(Level.INFO, "Ingoring {0} as it already existed remotely", fp.toString());
+            SoapPhoto sp = fp.toSOAPObject();
+            if (!isUploadEligible(fp)) {
+                LOG.log(Level.INFO, "Ignoring {0} as it is a duplicate of a photo already processed in this scan", fp.toString());
+            } else if (!UploadEligibilityChecker.getInstance().checkSingle(sp)) {
+                LOG.log(Level.INFO, "Ignoring {0} as it already existed remotely", fp.toString());
             } else {
                 try {
                     LOG.log(Level.FINE, "Preparing to upload {0}", fp.toString());
@@ -131,13 +138,13 @@ public class ScanPhotoTask extends PhotoController implements Runnable {
                     UploadPhotoTask upt = new UploadPhotoTask(sp, data);
                     uploadPool.submit(upt);
                     ExistingPhotoWSException ex = upt.get();
-                    if(ex == null) {
+                    if (ex == null) {
                         LOG.log(Level.INFO, "Uploaded {0} in {1} ms",
                                 new Object[]{fp.toString(), upt.getDurationMs()});
                     } else {
                         LOG.log(Level.SEVERE,
                                 "Attempt to insert photo failed("
-                                        + fp.getAbsolutePath() + ")", ex);
+                                + fp.getAbsolutePath() + ")", ex);
                     }
                 } catch (InterruptedException ex1) {
                     LOG.log(Level.SEVERE, null, ex1);
@@ -146,14 +153,14 @@ public class ScanPhotoTask extends PhotoController implements Runnable {
         }
     }
 
-    
     /**
      * isUploadEligible checks if the photo exists in the temporary database,
-     * which contains the photos uploaded thus far. 
-     * If the photo exists, it is checked if the blocking photo is eligible to
-     * be replaced with the provided one.
+     * which contains the photos uploaded thus far. If the photo exists, it is
+     * checked if the blocking photo is eligible to be replaced with the
+     * provided one.
+     *
      * @param fp
-     * @return 
+     * @return
      */
     private static boolean isUploadEligible(FilePhoto fp) {
         try {
@@ -171,21 +178,6 @@ public class ScanPhotoTask extends PhotoController implements Runnable {
             }
         }
         return true;
-    }
-
-    private static SoapPhoto toSoapPhoto(FilePhoto fp) {
-        SoapPhoto SoapPhoto = new SoapPhoto();
-        SoapPhoto.setCamera(fp.getCamera());
-        SoapPhoto.setFileName(fp.getFileName());
-        SoapPhoto.setFileNameNoExtention(fp.getFileNameNoExtention());
-        SoapPhoto.setHRes(fp.getHRes());
-        SoapPhoto.setVRes(fp.getVRes());
-        try {
-            SoapPhoto.setShotDate(fp.getShotDateXML());
-        } catch (DatatypeConfigurationException ex) {
-            LOG.log(Level.SEVERE, "Funky exception", ex);
-        }
-        return SoapPhoto;
     }
 
     public static int getProcessed() {

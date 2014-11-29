@@ -6,7 +6,6 @@
 package photodb.processing;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -14,13 +13,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.ws.BindingProvider;
 import photodb.concurrent.BufferedExecutor;
 import photodb.config.Config;
 import photodb.config.NotInitializedException;
 import photodb.wsclient.PhotoDBWS;
 import photodb.wsclient.PhotoDBWS_Service;
-import photodb.wsclient.SoapPhoto;
+import photodb.photo.SoapPhoto;
 
 /**
  * Thread for dispatching uploadEligibility checks in bulks of 20 for efficiency
@@ -78,6 +78,7 @@ public class UploadEligibilityChecker extends BufferedExecutor<SoapPhoto, Boolea
      * @return boolean indicating that the photo was eligible for upload
      */
     public boolean check(SoapPhoto sp) {
+        //return true;
         final int timeoutSeconds = 30;
         Future<Boolean> result;
         try {
@@ -102,6 +103,11 @@ public class UploadEligibilityChecker extends BufferedExecutor<SoapPhoto, Boolea
         }
         return false;
     }
+    
+    public boolean checkSingle(SoapPhoto sp) {
+        return port.isUploadEligible(marshalSoapPhoto(sp));
+    }
+    
 
     /**
      * Executes the actual call to the web service in a bulk fashion.
@@ -109,10 +115,40 @@ public class UploadEligibilityChecker extends BufferedExecutor<SoapPhoto, Boolea
      */
     @Override
     protected void executeJobs() {
-        List<SoapPhoto> arg = new ArrayList<>(getInputs());
-        List<SoapPhoto> reply = port.isArrayUploadEligible(arg);
-        for (SoapPhoto sp : reply) {
-            completeJob(sp, sp.isEligible());
+        List<photodb.wsclient.SoapPhoto> arg = new ArrayList<>();
+        for(SoapPhoto sp : getInputs()) {
+            arg.add(marshalSoapPhoto(sp));
         }
+        List<photodb.wsclient.SoapPhoto> reply = port.isArrayUploadEligible(arg);
+        for (photodb.wsclient.SoapPhoto sp : reply) {
+            completeJob(unmarshalSoapPhoto(sp), sp.isEligible());
+        }
+    }
+    
+    
+    private static photodb.wsclient.SoapPhoto marshalSoapPhoto(SoapPhoto sp) {
+        photodb.wsclient.SoapPhoto SoapPhoto = new photodb.wsclient.SoapPhoto();
+        SoapPhoto.setCamera(sp.getCamera());
+        SoapPhoto.setFileName(sp.getFileName());
+        SoapPhoto.setFileNameNoExtention(sp.getFileNameNoExtention());
+        SoapPhoto.setHRes(sp.getHRes());
+        SoapPhoto.setVRes(sp.getVRes());
+        try {
+            SoapPhoto.setShotDate(sp.getShotDateXML());
+        } catch (DatatypeConfigurationException ex) {
+            LOG.log(Level.SEVERE, "Funky exception", ex);
+        }
+        return SoapPhoto;
+    }
+    
+    private static SoapPhoto unmarshalSoapPhoto(photodb.wsclient.SoapPhoto sp) {
+        SoapPhoto SoapPhoto = new SoapPhoto();
+        SoapPhoto.setCamera(sp.getCamera());
+        SoapPhoto.setFileName(sp.getFileName());
+        SoapPhoto.setFileNameNoExtention(sp.getFileNameNoExtention());
+        SoapPhoto.setHRes(sp.getHRes());
+        SoapPhoto.setVRes(sp.getVRes());
+        SoapPhoto.setShotDate(sp.getShotDate().toGregorianCalendar().getTime());
+        return SoapPhoto;
     }
 }

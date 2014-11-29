@@ -3,8 +3,8 @@
   <services/>
   <clients>
     <client name="PhotoDBWS">
-      <wsdl-url>http://localhost:8084/PhotoDbWS/PhotoDBWS?wsdl</wsdl-url>
-      <local-wsdl-file>localhost_8084/PhotoDbWS/PhotoDBWS.wsdl</local-wsdl-file>
+      <wsdl-url>http://192.168.1.13:8080/PhotoDbWS/PhotoDBWS?wsdl</wsdl-url>
+      <local-wsdl-file>192.168.1.13_8080/PhotoDbWS/PhotoDBWS.wsdl</local-wsdl-file>
       <package-name forceReplace="true">photodb.wsclient</package-name>
       <catalog-file>catalog.xml</catalog-file>
       <wsimport-options>

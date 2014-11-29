@@ -1,0 +1,71 @@
+<?xml version='1.0' encoding='UTF-8'?><!-- Published by JAX-WS RI at http://jax-ws.dev.java.net. RI's version is JAX-WS RI 2.2-hudson-740-. --><xs:schema xmlns:tns="http://ws.photodb/" xmlns:xs="http://www.w3.org/2001/XMLSchema" version="1.0" targetNamespace="http://ws.photodb/">
+
+<xs:element name="ExistingPhotoWSException" nillable="true" type="tns:photo" />
+
+<xs:element name="add" type="tns:add" />
+
+<xs:element name="addResponse" type="tns:addResponse" />
+
+<xs:element name="isArrayUploadEligible" type="tns:isArrayUploadEligible" />
+
+<xs:element name="isArrayUploadEligibleResponse" type="tns:isArrayUploadEligibleResponse" />
+
+<xs:element name="isUploadEligible" type="tns:isUploadEligible" />
+
+<xs:element name="isUploadEligibleResponse" type="tns:isUploadEligibleResponse" />
+
+<xs:complexType name="isUploadEligible">
+<xs:sequence>
+<xs:element name="soapphoto" type="tns:soapPhoto" />
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="soapPhoto">
+<xs:complexContent>
+<xs:extension base="tns:photo">
+<xs:sequence>
+<xs:element name="hRes" type="xs:int" />
+<xs:element name="vRes" type="xs:int" />
+<xs:element name="shotDate" type="xs:dateTime" />
+<xs:element name="camera" type="xs:string" />
+<xs:element name="fileName" type="xs:string" />
+<xs:element name="fileNameNoExtention" type="xs:string" />
+<xs:element name="eligible" type="xs:boolean" nillable="true" />
+</xs:sequence>
+</xs:extension>
+</xs:complexContent>
+</xs:complexType>
+
+<xs:complexType name="photo" abstract="true">
+<xs:sequence />
+</xs:complexType>
+
+<xs:complexType name="isUploadEligibleResponse">
+<xs:sequence>
+<xs:element name="return" type="xs:boolean" />
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="add">
+<xs:sequence>
+<xs:element name="soapphoto" type="tns:soapPhoto" />
+<xs:element name="imageBytes" type="xs:base64Binary" nillable="true" />
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="addResponse">
+<xs:sequence />
+</xs:complexType>
+
+<xs:complexType name="isArrayUploadEligible">
+<xs:sequence>
+<xs:element name="photos" type="tns:soapPhoto" maxOccurs="unbounded" />
+</xs:sequence>
+</xs:complexType>
+
+<xs:complexType name="isArrayUploadEligibleResponse">
+<xs:sequence>
+<xs:element name="return" type="tns:soapPhoto" minOccurs="0" maxOccurs="unbounded" />
+</xs:sequence>
+</xs:complexType>
+</xs:schema>

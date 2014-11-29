@@ -43,7 +43,7 @@ import photodb.photo.Photo;
  */
 public class PhotoController {
 
-    private final static Logger LOG = Logger.getLogger(ScanPhotoTask.class.getName());
+    private final static Logger LOG = Logger.getLogger(PhotoController.class.getName());
     private final String store;
     private final Database db;
 

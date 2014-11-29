@@ -21,10 +21,15 @@ import photodb.log.ConsoleFormatter;
  * @author Steffen Schumacher
  */
 public class FilePhotoTest {
+
     final static private String folder = "test/photodb/photo/";
     final static private Logger LOG = Logger.getLogger(FilePhotoTest.class.getName());
-    
-    static {
+
+    public FilePhotoTest() {
+    }
+
+    @BeforeClass
+    public static void setUpClass() {
         final Level lvl = Level.ALL;
         Handler h = new ConsoleHandler();
         h.setLevel(lvl);
@@ -32,21 +37,15 @@ public class FilePhotoTest {
         Logger.getLogger("photodb").setLevel(lvl);
         Logger.getLogger("photodb").addHandler(h);
     }
-    public FilePhotoTest() {
-    }
-    
-    @BeforeClass
-    public static void setUpClass() {
-    }
-    
+
     @AfterClass
     public static void tearDownClass() {
     }
-    
+
     @Before
     public void setUp() {
     }
-    
+
     @After
     public void tearDown() {
     }
@@ -67,7 +66,7 @@ public class FilePhotoTest {
             assertEquals("Canon DIGITAL IXUS 500", instance.getCamera());
         } catch (ImageProcessingException | IOException | PhotoTooSmallException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
-            fail("Unhandled exception: "+ex.getMessage() + ".");
+            fail("Unhandled exception: " + ex.getMessage() + ".");
         }
     }
 
@@ -88,11 +87,10 @@ public class FilePhotoTest {
             assertEquals("NIKON D300", instance.getCamera());
         } catch (ImageProcessingException | IOException | PhotoTooSmallException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
-            fail("Unhandled exception: "+ex.getMessage() + ".");
+            fail("Unhandled exception: " + ex.getMessage() + ".");
         }
     }
-    
-    
+
     /**
      * Test of IMG_1127.jpg using class FilePhoto.
      */
@@ -110,11 +108,10 @@ public class FilePhotoTest {
             assertEquals("NIKON D300", instance.getCamera());
         } catch (ImageProcessingException | IOException | PhotoTooSmallException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
-            fail("Unhandled exception: "+ex.getMessage() + ".");
+            fail("Unhandled exception: " + ex.getMessage() + ".");
         }
     }
 
-        
     /**
      * Test of IMG_1127.jpg using class FilePhoto.
      */
@@ -132,10 +129,10 @@ public class FilePhotoTest {
             assertEquals("CanoScan LiDE 210", instance.getCamera());
         } catch (ImageProcessingException | IOException | PhotoTooSmallException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
-            fail("Unhandled exception: "+ex.getMessage() + ".");
+            fail("Unhandled exception: " + ex.getMessage() + ".");
         }
     }
-            
+
     /**
      * Test of IMG_1127.jpg using class FilePhoto.
      */
@@ -145,7 +142,7 @@ public class FilePhotoTest {
         System.out.println(img);
         FilePhoto instance;
         try {
-            FilePhoto.logMetaData(folder+ img);
+            FilePhoto.logMetaData(folder + img);
             instance = new FilePhoto(folder + img);
             assertEquals(680, instance.getHRes());
             assertEquals(932, instance.getVRes());
@@ -153,10 +150,10 @@ public class FilePhotoTest {
             assertEquals("CanoScan LiDE 210", instance.getCamera());
         } catch (ImageProcessingException | IOException | PhotoTooSmallException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
-            fail("Unhandled exception: "+ex.getMessage() + ".");
+            fail("Unhandled exception: " + ex.getMessage() + ".");
         }
     }
-    
+
     @Test
     public void testErrorHandling() {
         final String img = "/Volumes/HomeDisk/Billeder/Bryllup/Bryllupsrejsen/._IMG_1717.JPG";
@@ -170,12 +167,12 @@ public class FilePhotoTest {
             assertEquals("CanoScan LiDE 210", instance.getCamera());
         } catch (ImageProcessingException | IOException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
-            fail("Unhandled exception: "+ex.getMessage() + ".");
+            fail("Unhandled exception: " + ex.getMessage() + ".");
         } catch (PhotoTooSmallException ex) {
             Logger.getLogger(FilePhotoTest.class.getName()).log(Level.INFO, ex.getMessage());
         }
     }
-    
+
     @Test
     public void testMissingTags() {
         final String img = "/Volumes/HomeDisk/Billeder/Bryllup/Bryllupsrejsen/IMG_1782.JPG";
@@ -189,21 +186,21 @@ public class FilePhotoTest {
             assertEquals("CanoScan LiDE 210", instance.getCamera());
         } catch (ImageProcessingException | IOException | PhotoTooSmallException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
-            fail("Unhandled exception: "+ex.getMessage() + ".");
+            fail("Unhandled exception: " + ex.getMessage() + ".");
         }
     }
-    
+
     public void dumpImg(String img) {
         FilePhoto instance;
         try {
-            FilePhoto.logMetaData(folder+ img);
+            FilePhoto.logMetaData(folder + img);
             instance = new FilePhoto(folder + img);
             System.err.println(instance.getHRes() + "x" + instance.getVRes() + ",");
             System.err.println("D: " + instance.getShotDate() + ", " + instance.getShotDate().getTime() + ",");
             System.err.println("Camera: " + instance.getCamera());
         } catch (ImageProcessingException | IOException ex) {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
-            fail("Unhandled exception: "+ex.getMessage() + ".");
+            fail("Unhandled exception: " + ex.getMessage() + ".");
         } catch (PhotoTooSmallException ex) {
             Logger.getLogger(FilePhotoTest.class.getName()).log(Level.SEVERE, ex.getLocalizedMessage());
         }

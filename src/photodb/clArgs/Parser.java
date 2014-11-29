@@ -39,7 +39,7 @@ public class Parser {
                 .hasArg()
                 .isRequired(false)
                 .withLongOpt("Level")
-                .create("l"));
+                .create("d"));
         _opts.addOption(OptionBuilder.withArgName("m")
                 .withDescription("Minimum picturesize in kilobytes")
                 .hasArg()
