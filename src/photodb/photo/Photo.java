@@ -99,7 +99,7 @@ public abstract class Photo {
     }
     
     public boolean satisfiesCriteria() {
-        if(getShotDate() == null) {
+        if(getShotDate() == null || getCamera() == null) {
             return false;
         }
         try {

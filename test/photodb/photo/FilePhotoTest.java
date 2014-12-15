@@ -172,6 +172,28 @@ public class FilePhotoTest {
             Logger.getLogger(FilePhotoTest.class.getName()).log(Level.INFO, ex.getMessage());
         }
     }
+    
+    
+    @Test
+    public void testPowerShotS90() {
+        final String img = "/Volumes/USBHD/BackupRod/backup03072013/Pictures/3.  Argentina og Iguazu Brasilien/IMG_2217.JPG";
+        FilePhoto instance;
+        try {
+            //FilePhoto.logMetaData(img);
+            instance = new FilePhoto(img);
+            assertEquals(680, instance.getHRes());
+            assertEquals(932, instance.getVRes());
+            assertEquals(new Date(1392544345000L), instance.getDate());
+            assertEquals("CanoScan LiDE 210", instance.getCamera());
+        } catch (ImageProcessingException | IOException ex) {
+            LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
+            fail("Unhandled exception: " + ex.getMessage() + ".");
+        } catch (PhotoTooSmallException ex) {
+            Logger.getLogger(FilePhotoTest.class.getName()).log(Level.INFO, ex.getMessage());
+        }
+    }
+    
+    
 
     @Test
     public void testMissingTags() {

@@ -112,7 +112,8 @@ public class PhotoController {
                 LOG.log(Level.FINE, "created dir {0}", monthDir.getPath());
             }
         }
-        File dest = new File(monthDir.getAbsolutePath() + "/" + fp.getFileName());
+        final String postfix = getTimeWithinMonth(fp.getShotDate());
+        File dest = new File(monthDir.getAbsolutePath() + "/" + postfix + "_" + fp.getFileName());
         return dest;
     }
 
@@ -134,6 +135,11 @@ public class PhotoController {
 
     private String getSubfolder(Date shot) {
         SimpleDateFormat sdf = new SimpleDateFormat("/yyyy/MM/");
+        return sdf.format(shot);
+    }
+
+    private String getTimeWithinMonth(Date shot) {
+        SimpleDateFormat sdf = new SimpleDateFormat("ddHHmmss_");
         return sdf.format(shot);
     }
 
