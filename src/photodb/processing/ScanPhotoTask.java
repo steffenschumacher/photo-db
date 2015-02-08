@@ -118,6 +118,7 @@ public class ScanPhotoTask extends PhotoController implements Runnable {
         if (isLocal) {
             ExistingPhotoException exphex = super.checkExistence(fp);
             if(exphex == null || exphex.isToBeReplaced()) {    
+                super.insert(fp);
                 LOG.log(Level.INFO, "Stored {0}", new Object[]{fp.toString()});
             } else {
                 LOG.log(Level.INFO, 
