@@ -172,8 +172,7 @@ public class FilePhotoTest {
             Logger.getLogger(FilePhotoTest.class.getName()).log(Level.INFO, ex.getMessage());
         }
     }
-    
-    
+
     @Test
     public void testPowerShotS90() {
         final String img = "/Volumes/USBHD/BackupRod/backup03072013/Pictures/3.  Argentina og Iguazu Brasilien/IMG_2217.JPG";
@@ -192,8 +191,6 @@ public class FilePhotoTest {
             Logger.getLogger(FilePhotoTest.class.getName()).log(Level.INFO, ex.getMessage());
         }
     }
-    
-    
 
     @Test
     public void testMissingTags() {
@@ -210,6 +207,22 @@ public class FilePhotoTest {
             LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
             fail("Unhandled exception: " + ex.getMessage() + ".");
         }
+    }
+
+    @Test
+    public void testPreferEarliestDate() {
+        final String img = "02090941__IMG_0358.jpg";
+        System.out.println("testPreferGPSDate");
+        FilePhoto instance;
+        try {
+            FilePhoto.logMetaData(folder + img);
+            instance = new FilePhoto(folder + img);
+            assertEquals(1266667507000L, instance.getDate().getTime());
+        } catch (ImageProcessingException | IOException | PhotoTooSmallException ex) {
+            LOG.log(Level.SEVERE, "Unhandled exception: " + ex.getMessage(), ex);
+            fail("Unhandled exception: " + ex.getMessage() + ".");
+        }
+
     }
 
     public void dumpImg(String img) {

@@ -20,7 +20,7 @@ public class ExistingPhotoException extends SQLException {
         super("Couldn't insert " + attempted + ", due to existing " + blocker);
         this.blocking = blocker;
         toBeReplaced = (!blocker.getFileName().toLowerCase().startsWith("img_") && 
-                attempted.getFileName().toLowerCase().startsWith("img_"));
+                attempted.getCleanedFilename().toLowerCase().startsWith("img_"));
     }
 
     public Photo getBlockingPhoto() {

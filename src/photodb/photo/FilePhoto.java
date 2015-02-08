@@ -6,6 +6,8 @@ import com.drew.metadata.Directory;
 import com.drew.metadata.Metadata;
 import com.drew.metadata.MetadataException;
 import com.drew.metadata.Tag;
+import com.drew.metadata.exif.ExifIFD0Directory;
+import com.drew.metadata.exif.ExifSubIFDDirectory;
 import java.awt.Point;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -15,6 +17,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -145,15 +148,38 @@ public class FilePhoto extends Photo {
         }
     }
     //</editor-fold>
-    
+
     //<editor-fold defaultstate="collapsed" desc="Helper methods for parsing metadata">
     private Date findShotDate(final Metadata md) {
+        final long mask = 0xFFFFFFFFFFFF0000L; //allow tolerance of 65535 milliseconds
+        Date retval = null;
         try {
-            return (Date) findDataInDirectoriesFor(_metFindShotDate, md);
+            HashMap<Class<? extends Directory>, Object> dates = findDataInDirectoriesFor(_metFindShotDate, md, 5);
+            Class<? extends Directory> retvalKey = Directory.class;
+            long retvalMasked = 0;
+            for (Class<? extends Directory> dir : dates.keySet()) {
+                Date candidate = (Date) dates.get(dir);
+                long candMasked = candidate.getTime() & mask;
+                if (retval == null) {
+                    retval = candidate;
+                    retvalKey = dir;
+                    retvalMasked = candMasked;
+                } else if (retvalMasked == candMasked || retvalKey.equals(ExifSubIFDDirectory.class)) {
+                    //Date within tolerance of previous or preferred exif type
+                } else if (dir.equals(ExifSubIFDDirectory.class)) {
+                    retval = candidate;
+                    retvalKey = dir;
+                    retvalMasked = candMasked;
+                } else {
+                    LOG.log(Level.SEVERE,
+                            "Found date differing from previous ({0}:{1} vs. {2}:{3} - using earliest for {4}.",
+                            new Object[]{retval, retvalKey.getSimpleName(), candidate, dir.getSimpleName(), absPath});
+                }
+            }
         } catch (NullPointerException e) {
             LOG.log(Level.FINE, "{0} for {1}", new Object[]{e.getMessage(), absPath});
-            return null;
         }
+        return retval;
     }
 
     private String findCamera(final Metadata md) {
@@ -229,15 +255,21 @@ public class FilePhoto extends Photo {
     }
 
     private Object findDataInDirectoriesFor(Method m, Metadata md) {
+        HashMap<Class<? extends Directory>, Object> retvalArr = findDataInDirectoriesFor(m, md, 1);
+        return retvalArr.values().iterator().next();
+    }
+
+    private HashMap<Class<? extends Directory>, Object> findDataInDirectoriesFor(Method m, Metadata md, int max) {
+        HashMap<Class<? extends Directory>, Object> results = new HashMap<>();
         Iterator<Class<? extends Directory>> dirIter = directories.iterator();
-        while (dirIter.hasNext()) {
+        while (dirIter.hasNext() && results.size() < max) {
             Class<? extends Directory> dir = dirIter.next();
             if (md.containsDirectory(dir)) {
                 try {
                     Object retval = m.invoke(this, new Object[]{md.getDirectory(dir)});
                     LOG.log(Level.FINEST, "Successfully retrieved data using {0} in {1} for {2}",
                             new Object[]{m.getName(), dir.getSimpleName(), absPath});
-                    return retval;
+                    results.put(dir, retval);
                 } catch (NullPointerException e) {
                     LOG.log(Level.FINEST, "{0} for {1}", new Object[]{e.getMessage(), absPath});
                 } catch (IllegalAccessException | IllegalArgumentException ex) {
@@ -253,7 +285,11 @@ public class FilePhoto extends Photo {
                 LOG.log(Level.FINEST, "Removing {0} from list of dirs for {1}", new Object[]{dir.getSimpleName(), absPath});
             }
         }
-        throw new NullPointerException("Didn't find data with method: " + m.getName());
+        if (results.isEmpty()) {
+            throw new NullPointerException("Didn't find data with method: " + m.getName());
+        } else {
+            return results;
+        }
     }
 
     @Override

@@ -38,6 +38,15 @@ public abstract class Photo {
 
     public abstract String getFileNameNoExtention();
 
+    public String getCleanedFilename() {
+        String cleaned = getFileName();
+        int imgIdx = cleaned.toUpperCase().indexOf("IMG_");
+        if(imgIdx > 0) {
+            cleaned = cleaned.substring(imgIdx);
+        }
+        return cleaned;
+    }
+    
     public SoapPhoto toSOAPObject() {
         return new SoapPhoto(getHRes(), getVRes(), getShotDate(), getCamera(), getFileName(), getFileNameNoExtention());
     }

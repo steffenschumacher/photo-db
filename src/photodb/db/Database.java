@@ -102,17 +102,28 @@ public class Database {
     }
 
     public final void insert(Photo p) throws ExistingPhotoException {
+        PreparedStatement insert = null;
         try {
-            PreparedStatement insert = connection.prepareStatement(_SqlInsert);
-            insert.setString(1, p.getFileName());
+            insert = connection.prepareStatement(_SqlInsert);
+            insert.setString(1, p.getCleanedFilename());
             insert.setLong(2, p.getShotDate().getTime());
             insert.setInt(3, p.getVRes());
             insert.setInt(4, p.getHRes());
             insert.setString(5, p.getCamera());
             int inserted = insert.executeUpdate();
         } catch (SQLException ex) {
-            if (ex.getMessage().contains("columns shot, camera are not unique")) {
-                throw new ExistingPhotoException(findByDate(p.getShotDate()), p);
+            if (insert != null &&
+                    ex.getMessage().contains("columns shot, camera are not unique")) {
+                try {
+                    Thread.sleep(1000);
+                    insert.executeQuery();
+                } catch (SQLException e) {
+                    if(ex.getMessage().contains("columns shot, camera are not unique")) {
+                        throw new ExistingPhotoException(findByDate(p.getShotDate()), p);
+                    }
+                } catch (InterruptedException ex1) {
+                    LOG.log(Level.SEVERE, null, ex1);
+                }
             } else {
                 LOG.log(Level.SEVERE, "Unable to insert " + p.toString(), ex);
             }
@@ -127,7 +138,7 @@ public class Database {
     public final void updateFileName(Photo p) {
         try {
             PreparedStatement update = connection.prepareStatement(_SqlUpdName);
-            update.setString(1, p.getFileName());
+            update.setString(1, p.getCleanedFilename());
             update.setLong(2, p.getShotDate().getTime());
             update.setString(3, p.getCamera());
             int updated = update.executeUpdate();

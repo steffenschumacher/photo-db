@@ -81,6 +81,23 @@ public class PhotoController {
         }
     }
     
+    public ExistingPhotoException checkExistence(Photo filephoto) {
+        try {
+            db.insert(filephoto);
+            db.delete(filephoto);
+            return null;
+        } catch (ExistingPhotoException e) {
+            return e;
+        } catch(NullPointerException npe) {
+            LOG.log(Level.SEVERE, "NPE: during insert: " + filephoto.toString(), npe);
+            try {
+                db.insert(filephoto);
+            } catch (ExistingPhotoException ex) {
+                Logger.getLogger(PhotoController.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            return null;
+        }
+    }
     
 
     public void insert(FilePhoto fp) throws ExistingPhotoException, IOException {
@@ -113,7 +130,7 @@ public class PhotoController {
             }
         }
         final String postfix = getTimeWithinMonth(fp.getShotDate());
-        File dest = new File(monthDir.getAbsolutePath() + "/" + postfix + "_" + fp.getFileName());
+        File dest = new File(monthDir.getAbsolutePath() + "/" + postfix + "_" + fp.getCleanedFilename());
         return dest;
     }
 

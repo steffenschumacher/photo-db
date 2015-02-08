@@ -11,7 +11,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.xml.datatype.DatatypeConfigurationException;
 import photodb.db.Database;
 import photodb.db.ExistingPhotoException;
 import photodb.photo.FilePhoto;
@@ -117,11 +116,13 @@ public class ScanPhotoTask extends PhotoController implements Runnable {
     @Override
     public void insert(FilePhoto fp) throws ExistingPhotoException, IOException {
         if (isLocal) {
-            if (super.isDesired(fp)) {
-                super.insert(fp);
+            ExistingPhotoException exphex = super.checkExistence(fp);
+            if(exphex == null || exphex.isToBeReplaced()) {    
                 LOG.log(Level.INFO, "Stored {0}", new Object[]{fp.toString()});
             } else {
-                LOG.log(Level.INFO, "Ignoring {0} as it is a duplicate of a photo already stored", fp.toString());
+                LOG.log(Level.INFO, 
+                        "Ignoring {0} as it is a duplicate of a photo already stored: {1}", 
+                        new Object[]{fp.toString(), exphex.getBlockingPhoto().toString()});
             }
 
         } else {
