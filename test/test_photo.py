@@ -12,6 +12,20 @@ from photo_db.photo.exif_tags import update_exif
 from .conftest import STATIC_DIR, nearly_equals
 
 
+def test_raw_exif_dump_respects_debug_flag(capsys):
+    pytest.importorskip("rawpy", reason="rawpy (RAW conversion) is an optional dependency")
+    from photo_db.photo.arw_converter import _print_exif_tags
+
+    tags = {"Image Make": "SONY", "EXIF DateTimeOriginal": "2009:08:15 17:51:11"}
+    _print_exif_tags(tags, debug=False)
+    assert capsys.readouterr().out == ""
+
+    _print_exif_tags(tags, debug=True)
+    output = capsys.readouterr().out
+    assert "Image Make: SONY" in output
+    assert "EXIF DateTimeOriginal: 2009:08:15 17:51:11" in output
+
+
 def test_upload(web_client, clean_store):
     with open(STATIC_DIR / "08-190641-4631.jpeg", "rb") as sampleimg:
         img_data = sampleimg.read()

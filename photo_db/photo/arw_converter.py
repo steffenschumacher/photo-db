@@ -12,14 +12,19 @@ from photo_db.config import Config, default_config
 from photo_db.photo.photo import LocalPhoto
 
 
+def _print_exif_tags(tags: dict, debug: bool) -> None:
+    if debug:
+        for key, value in tags.items():
+            print(f"{key}: {value}")
+
+
 def convert_raw(path: str, config: Config = default_config) -> LocalPhoto:
     local_path = join(config.temp_folder(), f"{uuid4()}.jpeg")
     with open(path, "rb") as image_file:
         buf = BytesIO(image_file.read())
         buf.seek(0)
         tags = process_file(buf)
-    for k, v in tags.items():
-        print(f"{k}: {v}")
+    _print_exif_tags(tags, config.DEBUG)
     buf.seek(0)
     with rawpy.imread(buf) as raw:
         rgb = raw.postprocess()

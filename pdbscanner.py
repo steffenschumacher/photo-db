@@ -71,6 +71,7 @@ def main(argv: list[str] | None = None) -> None:
         store_url=args.libpath,
         store_user=args.user,
         store_pass=args.password,
+        debug=args.debug,
     )
     from photo_db.scanner import Scanner
 

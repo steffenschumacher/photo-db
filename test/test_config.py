@@ -32,6 +32,12 @@ def test_config_overrides_take_precedence_over_env(monkeypatch):
     assert cfg_from_env.HASH_SIZE == 42
 
 
+def test_debug_defaults_off_and_can_be_enabled(monkeypatch):
+    monkeypatch.delenv("PH_DEBUG", raising=False)
+    assert Config().DEBUG is False
+    assert Config(debug=True).DEBUG is True
+
+
 def test_diff_limit_uses_this_instances_similarity():
     strict = Config(store_url=tempfile.mkdtemp(), similarity=99)
     lenient = Config(store_url=tempfile.mkdtemp(), similarity=50)
