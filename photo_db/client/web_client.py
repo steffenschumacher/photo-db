@@ -8,6 +8,18 @@ from ..photo import Photo
 from .abstract_client import AbstractPDBClient
 
 
+def _response_json(r: Response) -> dict:
+    """Read a JSON body from either a real requests.Response (``.json()`` is
+    a method) or Flask's test client response (``.json`` is a property)."""
+    return r.json() if callable(r.json) else r.json
+
+
+def _response_content(r: Response) -> bytes:
+    """Read the raw body from either a real requests.Response (``.content``)
+    or Flask's test client response (``.data``)."""
+    return r.content if hasattr(r, "content") else r.data
+
+
 class WebClient:
     @classmethod
     def post(cls, *args, **kwargs) -> Response:
@@ -52,24 +64,24 @@ class WebPDBClient(AbstractPDBClient):
         url = f"{self.url}/image/{uuid}"
         r = self.client.get(url, **self.http_kwargs)
         self.process_response(r)
-        return r.content
+        return _response_content(r)
 
     def get_meta(self, uuid: str) -> Photo:
         url = f"{self.url}/meta/{uuid}"
         r = self.client.get(url, **self.http_kwargs)
         self.process_response(r)
-        kwargs = r.json() if callable(r.json) else r.json
-        return Photo(**kwargs, config=self.config)
+        return Photo(**_response_json(r), config=self.config)
 
     def hashes(self) -> dict[str, str]:
         url = f"{self.url}/hashes"
         r = self.client.get(url, **self.http_kwargs)
         self.process_response(r)
-        return r.json()
+        return _response_json(r)
 
     def process_response(self, r: Response):
         if r.status_code == 409:
-            if json := r.json:
+            json = _response_json(r)
+            if json:
                 if pdb_code := json.get("pdb_code"):
                     uuid = json["uuid"]
                     msg = json["msg"]

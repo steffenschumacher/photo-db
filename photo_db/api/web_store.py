@@ -1,3 +1,4 @@
+from io import BytesIO
 from json import loads
 
 from flask import Flask, request, send_file
@@ -44,7 +45,7 @@ def add_routes(app: Flask, config: Config = default_config):
             data = store.read_photo(ph)
 
             return send_file(
-                data,
+                BytesIO(data),
                 download_name=ph.filename(),
                 mimetype=f"image/{ph.extension.lower()}",
                 as_attachment=False,

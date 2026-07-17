@@ -11,9 +11,6 @@ from photo_db.photo.exif_tags import update_exif
 
 from .conftest import STATIC_DIR, nearly_equals
 
-pytest.importorskip("rawpy", reason="rawpy (RAW conversion) is an optional dependency")
-from photo_db.photo.arw_converter import convert_raw  # noqa: E402
-
 
 def test_upload(web_client, clean_store):
     with open(STATIC_DIR / "08-190641-4631.jpeg", "rb") as sampleimg:
@@ -41,6 +38,9 @@ def test_update_exif(exif_incomplete_photo):
 @pytest.mark.skipif(which("exiftool") is None, reason="requires the exiftool binary")
 @pytest.mark.network
 def test_convert_raw(raw_photo):
+    pytest.importorskip("rawpy", reason="rawpy (RAW conversion) is an optional dependency")
+    from photo_db.photo.arw_converter import convert_raw
+
     ph = convert_raw(raw_photo)
     print(ph.local_path)
     coords = get_coords("Strandvejen 154A, 8410, Danmark")

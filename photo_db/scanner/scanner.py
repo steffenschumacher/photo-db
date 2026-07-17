@@ -17,7 +17,7 @@ from photo_db.db.scanner import ScanDB
 from photo_db.photo import LocalPhoto, Photo
 
 _ignore_pat = compile(r".*(\.AppleDouble).*", IGNORECASE)
-_consider_pat = compile(r"\S+\.(jpg|jepg|heic|arw)", IGNORECASE)
+_consider_pat = compile(r"\S+\.(jpg|jpeg|heic|heif|arw)", IGNORECASE)
 _raw_pat = compile(r"\S+\.arw", IGNORECASE)
 
 
