@@ -1,12 +1,12 @@
+import subprocess
 from io import BytesIO
 from os.path import join
 from uuid import uuid4
-import subprocess
-import rawpy
+
 import imageio
-from exif import Image
-from exif import _constants as exif_constants
+import rawpy
 from exifread import process_file
+
 from photo_db.config import Config
 from photo_db.photo.photo import LocalPhoto
 

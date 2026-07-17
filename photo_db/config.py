@@ -1,7 +1,7 @@
+import tempfile
+
 from dotenv import load_dotenv
 from environs import Env
-from os.path import join
-import tempfile
 
 env = Env()
 load_dotenv()

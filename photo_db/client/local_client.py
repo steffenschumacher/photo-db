@@ -1,8 +1,7 @@
-from io import BytesIO
-from ..config import Config
-from .abstract_client import AbstractPDBClient
-from ..photo import Photo
 from photo_db.store.logic import LocalStore
+
+from ..photo import Photo
+from .abstract_client import AbstractPDBClient
 
 
 class LocalPDBClient(AbstractPDBClient):

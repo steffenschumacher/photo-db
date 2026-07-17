@@ -1,11 +1,12 @@
-from time import sleep
 from threading import Thread
+from time import sleep
+
 import wx
 from wx.lib.scrolledpanel import ScrolledPanel
 
 from photo_db.photo.photo import LocalPhoto
 from photo_db.scanner.scanner import Scanner
-from photo_db.ui.filters import *
+from photo_db.ui.filters import mpixel, taken_date, trim_path
 
 def_stl = wx.ALIGN_LEFT
 
@@ -15,15 +16,21 @@ class ImportFrame(wx.Frame):
         screenSize = wx.DisplaySize()
         self.screenWidth = screenSize[0]
         self.screenHeight = screenSize[1]
-        super().__init__(parent, title=title, size=screenSize, style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER)
-        self.cols = {"Path": ("local_path", 520, trim_path),
-                     "Resolution": ("pixels", 65, mpixel),
-                     "Camera": ("camera", 160, None),
-                     "From": ("date", 160, taken_date),
-                     "GPS": ("gps", 100, None),
-                     "Status": ("status", 90, None),
-                     "Details": ("reject_reason", 450, None),
-                     }
+        super().__init__(
+            parent,
+            title=title,
+            size=screenSize,
+            style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER,
+        )
+        self.cols = {
+            "Path": ("local_path", 520, trim_path),
+            "Resolution": ("pixels", 65, mpixel),
+            "Camera": ("camera", 160, None),
+            "From": ("date", 160, taken_date),
+            "GPS": ("gps", 100, None),
+            "Status": ("status", 90, None),
+            "Details": ("reject_reason", 450, None),
+        }
         self.tPanel: wx.Panel = None
         self.InitUI()
         self.Centre()
@@ -31,7 +38,7 @@ class ImportFrame(wx.Frame):
 
     def InitHeader(self, parent) -> wx.Panel:
         panel1 = wx.Panel(parent, size=(self.screenWidth, 28), style=wx.SIMPLE_BORDER)
-        panel1.SetBackgroundColour('#FDDF99')
+        panel1.SetBackgroundColour("#FDDF99")
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         font: wx.Font = wx.SystemSettings.GetFont(wx.SYS_SYSTEM_FONT)
@@ -48,9 +55,10 @@ class ImportFrame(wx.Frame):
             parent,
             size=(self.screenWidth - 6, self.screenHeight - 50),
             # pos=(0, 40),
-            style=wx.SIMPLE_BORDER)
+            style=wx.SIMPLE_BORDER,
+        )
         panel2.SetupScrolling()
-        panel2.SetBackgroundColour('#FFFFFF')
+        panel2.SetBackgroundColour("#FFFFFF")
         gs = wx.BoxSizer(wx.VERTICAL)
         panel2.SetSizer(gs)
         return panel2
@@ -58,10 +66,10 @@ class ImportFrame(wx.Frame):
     def InitImportMenu(self) -> wx.Menu:
         menubar = wx.MenuBar()
         importMenu = wx.Menu()
-        newScanItem = importMenu.Append(wx.ID_ANY, 'Scan..', 'Scan for photos')
-        loadScanItem = importMenu.Append(wx.ID_ANY, 'Load..', 'Load existing scan')
+        newScanItem = importMenu.Append(wx.ID_ANY, "Scan..", "Scan for photos")
+        loadScanItem = importMenu.Append(wx.ID_ANY, "Load..", "Load existing scan")
 
-        menubar.Append(importMenu, '&Import')
+        menubar.Append(importMenu, "&Import")
 
         self.Bind(wx.EVT_MENU, self.OnNewImport, newScanItem)
         self.Bind(wx.EVT_MENU, self.OnLoadImport, loadScanItem)
@@ -82,9 +90,8 @@ class ImportFrame(wx.Frame):
         self.SetSizer(vbox)
 
     def insertPhotoRow(self, ph: LocalPhoto):
-        cells = []
         bs = wx.BoxSizer(wx.HORIZONTAL)
-        for title, attr in self.cols.items():
+        for _title, attr in self.cols.items():
             if attr[0]:
                 if val := getattr(ph, attr[0], "N/A"):
                     if attr[2]:
@@ -97,6 +104,7 @@ class ImportFrame(wx.Frame):
 
     def OnNewImport(self, event):
         from photo_db.ui.dialogs import ScanInitDialog
+
         im_dia = ScanInitDialog(self, wx.ID_ANY, "Start new photo import")
         if sc := im_dia.scanner:
             Thread(target=self.monitor_scan_process, args=[sc]).start()

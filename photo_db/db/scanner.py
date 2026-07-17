@@ -1,8 +1,7 @@
-import time
 from datetime import datetime
-from sqlite3 import connect, Connection, OperationalError
+from sqlite3 import Connection, connect
 
-from ..photo import Photo, LocalPhoto
+from ..photo import LocalPhoto
 from .store import _table as store_table
 
 
@@ -49,14 +48,14 @@ class ScanDB:
         self.cnx.commit()
 
     def get_photo(self, uuid: str) -> LocalPhoto:
-        qry = f"{ self.select} WHERE uuid = '{uuid}')"
+        qry = f"{self.select} WHERE uuid = '{uuid}')"
         if cur := self.cnx.execute(qry):
             r = next(cur)
             photo_args = {f: r[idx] for idx, f in enumerate(self.table.keys())}
             return LocalPhoto(**photo_args)
 
     def lookup_hash(self, hash: str) -> str | None:
-        if cur := self.cnx.execute(f"{ self.select} WHERE hash = '{hash}')"):
+        if cur := self.cnx.execute(f"{self.select} WHERE hash = '{hash}')"):
             r = next(cur)
             return r[0]  # uuid is first value
 

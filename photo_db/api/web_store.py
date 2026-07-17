@@ -1,11 +1,11 @@
-from io import BytesIO
 from json import loads
+
 from flask import Flask, request, send_file
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.exceptions import NotFound
+
 from ..config import Config
 from ..photo import Photo
-
 
 auth = HTTPBasicAuth()
 
@@ -20,7 +20,7 @@ def authenticate(username, password):
 def add_routes(app: Flask):
     from photo_db.store.logic import LocalStore
 
-    print(f"Setting up app routes..")
+    print("Setting up app routes..")
     print(Config.info())
 
     @app.route("/pre_check", methods=["POST"])
@@ -56,7 +56,7 @@ def add_routes(app: Flask):
     @auth.login_required
     def meta_image(uuid: str):
         if ph := LocalStore.get_photo(uuid):
-            data = ph.dict()
+            data = ph.model_dump()
             if ph.date:
                 data["date"] = ph.date.timestamp()
             if ph.scanned:

@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 def trim_path(path: str) -> str:
     if not path:
         return ""
@@ -6,7 +9,7 @@ def trim_path(path: str) -> str:
     cut = 74
     if len(path) < cut:
         return path
-    cut1 = int(cut/2 - 2)
+    cut1 = int(cut / 2 - 2)
     cut2 = cut1 * -1
     try:
         return path[:cut1] + ".." + path[cut2:]
@@ -22,5 +25,5 @@ def mpixel(pixels: int) -> str:
     return f"{mpix:.0f} MP"
 
 
-def taken_date(dt: "datetime") -> str:
+def taken_date(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%d %H:%M:%S")

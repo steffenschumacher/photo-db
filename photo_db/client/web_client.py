@@ -1,9 +1,11 @@
 from io import BytesIO
-from requests import post, get, Response, exceptions
-from ..config import Config
-from .abstract_client import AbstractPDBClient
-from ..photo import Photo
+
+from requests import Response, get, post
+
 from ..api import DuplicateException, SimilarException
+from ..config import Config
+from ..photo import Photo
+from .abstract_client import AbstractPDBClient
 
 
 class WebClient:
@@ -35,7 +37,7 @@ class WebPDBClient(AbstractPDBClient):
     def check_hash(self, ph: Photo) -> bool:
         url = f"{self.url}/pre_check"
         client = self.client
-        r = client.post(url, json=ph.json(), **self.http_kwargs)
+        r = client.post(url, json=ph.model_dump_json(), **self.http_kwargs)
         self.process_response(r)
         return True
 

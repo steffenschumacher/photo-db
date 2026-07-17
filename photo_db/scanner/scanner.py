@@ -1,20 +1,19 @@
-from os.path import join, isdir, isfile, sep
-from os import listdir
-from datetime import datetime
-from time import time
-from threading import Lock
-from concurrent.futures import ThreadPoolExecutor, Future
 from collections import deque
-from uuid import uuid4
+from concurrent.futures import Future, ThreadPoolExecutor
+from datetime import datetime
+from os import listdir
+from os.path import isdir, isfile, join, sep
+from re import IGNORECASE, compile
+from threading import Lock
+from time import time
 from traceback import print_exc
-from re import compile, IGNORECASE
+from uuid import uuid4
 
-from photo_db.photo import LocalPhoto, Photo
-from photo_db.db.scanner import ScanDB
+from photo_db.api import DuplicateException, SimilarException
+from photo_db.client import AbstractPDBClient, init_client
 from photo_db.constants import IGNORABLE_EXTS
-from photo_db.client import *
-from photo_db.api import SimilarException, DuplicateException
-
+from photo_db.db.scanner import ScanDB
+from photo_db.photo import LocalPhoto, Photo
 
 _ignore_pat = compile(r".*(\.AppleDouble).*", IGNORECASE)
 _consider_pat = compile(r"\S+\.(jpg|jepg|heic)", IGNORECASE)
@@ -64,7 +63,9 @@ class Scanner:
     def processed_photos(self) -> list[LocalPhoto]:
         return self.db.search()
 
-    def uploading_complete(self, blocking=False, verbose=True, hz=100) -> tuple[bool, list[LocalPhoto]]:
+    def uploading_complete(
+        self, blocking=False, verbose=True, hz=100
+    ) -> tuple[bool, list[LocalPhoto]]:
         tick = None
         photos = []
         while True:
@@ -80,7 +81,10 @@ class Scanner:
                 if not tick:
                     tick = hz
                     if verbose:
-                        msg = f"Processed {self.processed}/{self.detected} photos - remaining: {len(self.futures)}"
+                        msg = (
+                            f"Processed {self.processed}/{self.detected} photos - "
+                            f"remaining: {len(self.futures)}"
+                        )
                         print(msg)
                 tick -= 1
             except TimeoutError:
@@ -143,13 +147,13 @@ class Scanner:
                     if other.preferable_to(ph):
                         ph.duplicate_src = "local"
                         ph.duplicate_uuid = other.uuid
-                        ph.reject_reason = f"too similar to processed photo"
+                        ph.reject_reason = "too similar to processed photo"
                         ph.status = "similar"
                         return False
                     else:
                         ph.duplicate_src = "local"
                         ph.duplicate_uuid = other.uuid
-                        ph.reject_reason = f"similar to processed photo, but preferable"
+                        ph.reject_reason = "similar to processed photo, but preferable"
             # we passed all the tests - we will try to upload this now...
             self.scan_hashes[ph.hash] = ph
             return True
@@ -168,13 +172,13 @@ class Scanner:
                     if other.preferable_to(ph):
                         ph.duplicate_src = "central"
                         ph.duplicate_uuid = uuid
-                        ph.reject_reason = f"too similar to imported photo"
+                        ph.reject_reason = "too similar to imported photo"
                         ph.status = "similar"
                         return ph
                     else:
                         ph.duplicate_src = "central"
                         ph.duplicate_uuid = uuid
-                        ph.reject_reason = f"similar to imported photo, but preferable"
+                        ph.reject_reason = "similar to imported photo, but preferable"
 
         # we passed all the tests - we will try to upload this now...
         try:

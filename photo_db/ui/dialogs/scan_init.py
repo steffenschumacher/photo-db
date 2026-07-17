@@ -1,5 +1,7 @@
+from os.path import dirname, exists, join
+
 import wx
-from os.path import join, isfile, exists
+
 from photo_db.config import Config
 from photo_db.scanner.scanner import Scanner
 
@@ -9,7 +11,7 @@ class ScanInitDialog(wx.Dialog):
         wx.Dialog.__init__(self, parent, id, title, size=(700, 300))
         self.SetIcon(
             wx.Icon(
-                "/Users/stsmr/PyCharmProjects/photo-db/photo_db/ui/dialogs/scan_init.ico",
+                join(dirname(__file__), "scan_init.ico"),
                 wx.BITMAP_TYPE_ICON,
             )
         )
@@ -50,9 +52,7 @@ class ScanInitDialog(wx.Dialog):
 
         lb_pw = wx.StaticText(pnl, label="Password")
         hBoxCred.Add(lb_pw, flag=wx.EXPAND | wx.ALL, border=10)
-        self.store_pw = wx.TextCtrl(
-            pnl, wx.ID_STATIC, "", size=(160, 22), style=wx.TE_PASSWORD
-        )
+        self.store_pw = wx.TextCtrl(pnl, wx.ID_STATIC, "", size=(160, 22), style=wx.TE_PASSWORD)
         if Config.STORE_PASS:
             self.store_pw.SetValue(Config.STORE_PASS)
         hBoxCred.Add(self.store_pw, flag=wx.EXPAND | wx.ALL, border=10)
@@ -102,23 +102,23 @@ class ScanInitDialog(wx.Dialog):
                     else:
                         raise ValueError(f"Missing password for {uri}")
             else:
-                raise ValueError(f"Store path/url is missing")
+                raise ValueError("Store path/url is missing")
             if path := self.import_path.GetValue():
                 pass
             else:
-                raise ValueError(f"Import path is missing")
+                raise ValueError("Import path is missing")
 
             client = init_client(uri)
             self.scanner = Scanner(client)
             self.scanner.scan_dir(path)
             msg = f"Scan of {self.scanner.detected} possible images started.."
             stl = wx.ICON_INFORMATION | wx.OK
-            yn = wx.MessageBox(msg, "Scan started", stl, self)
+            wx.MessageBox(msg, "Scan started", stl, self)
             self.Close()
         except Exception as e:
             msg = f"Error: {e}"
             stl = wx.ICON_ERROR | wx.OK
-            yn = wx.MessageBox(msg, "Error", stl, self)
+            wx.MessageBox(msg, "Error", stl, self)
             import traceback
 
             traceback.print_exc()

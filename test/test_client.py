@@ -1,6 +1,7 @@
 import tempfile
 from os.path import join
-from photo_db.client import WebPDBClient, LocalPDBClient, init_client
+
+from photo_db.client import LocalPDBClient, WebPDBClient, init_client
 from photo_db.config import Config
 
 

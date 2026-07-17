@@ -1,4 +1,4 @@
-FROM python:3.11-slim-bullseye AS base
+FROM python:3.13-slim-bookworm AS base
 
 FROM base AS install
 
@@ -9,13 +9,14 @@ RUN apt-get update && \
     rm -f /etc/nginx/sites-enabled/default
 
 
-ENV PYTHONPATH "${PYTHONPATH}:/project/"
+ENV PYTHONPATH="${PYTHONPATH}:/project/"
 # ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
 # where the images and the database is stored - create volume for this
 ENV PH_STORE_URL=/photodb
-ENV PH_STORE_USER=someshareduser
-ENV PH_STORE_PASS=somesharedpass!QAZ2wsx
+# PH_STORE_USER / PH_STORE_PASS must be provided at runtime (e.g. via
+# `docker run -e` / compose `environment:` / a secrets store) - there is no
+# usable built-in default, credentials must be set explicitly.
 # image hash size - larger is more detailed, but costs CPU/mem/bw
 ENV PH_HASH_SIZE=70
 EXPOSE 80/tcp
@@ -25,21 +26,22 @@ RUN set -eux; \
     savedAptMark="$(apt-mark showmanual)"; \
     apt-get update -y;  \
     apt-get install -qy gcc; \
-    pip install --no-cache-dir uwsgi; \
     apt-mark auto '.*' > /dev/null; \
 	  [ -z "$savedAptMark" ] || apt-mark manual $savedAptMark > /dev/null; \
 	  apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
    	rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 # Set default workdir
 WORKDIR /project
 
+# Install python dependencies (server/API side only - no ui/raw extras)
+COPY pyproject.toml uv.lock ./
+RUN uv sync --extra api --no-dev --no-install-project && \
+    uv pip install uwsgi
 
-# Install python dependencies
-COPY ./requirements-api.txt .
-RUN pip install --no-cache-dir -r requirements-api.txt
-
+ENV PATH="/project/.venv/bin:${PATH}"
 
 # copy server configs
 COPY server-conf/nginx.conf /etc/nginx/

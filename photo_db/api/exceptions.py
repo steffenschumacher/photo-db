@@ -1,4 +1,5 @@
 from json import dumps
+
 from werkzeug.exceptions import Conflict
 
 

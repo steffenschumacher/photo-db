@@ -1,24 +1,29 @@
-from datetime import datetime
-
-from pytest import raises
 from io import BytesIO
-from .conftest import nearly_equals
-from photo_db.photo import Photo, LocalPhoto
-from photo_db.photo.exif_tags import update_exif
-from photo_db.photo.arw_converter import convert_raw
+from shutil import which
+
+import pytest
+from pytest import raises
+
 from photo_db.api import DuplicateException, SimilarException
 from photo_db.geocoding.nominatim import get_coords
+from photo_db.photo import LocalPhoto, Photo
+from photo_db.photo.exif_tags import update_exif
+
+from .conftest import STATIC_DIR, nearly_equals
+
+pytest.importorskip("rawpy", reason="rawpy (RAW conversion) is an optional dependency")
+from photo_db.photo.arw_converter import convert_raw  # noqa: E402
 
 
 def test_upload(web_client, clean_store):
-    with open("static/08-190641-4631.jpeg", "rb") as sampleimg:
+    with open(STATIC_DIR / "08-190641-4631.jpeg", "rb") as sampleimg:
         img_data = sampleimg.read()
         ph = Photo.from_file(BytesIO(img_data), "08-190641-4631.jpeg")
         assert web_client.check_hash(ph)
         assert web_client.upload(img_data)
         with raises(DuplicateException):
             web_client.upload(img_data)
-    with open("static/08-190641-4631-modified.jpeg", "rb") as sampleimg:
+    with open(STATIC_DIR / "08-190641-4631-modified.jpeg", "rb") as sampleimg:
         img_data = sampleimg.read()
         with raises(SimilarException):
             web_client.upload(img_data)
@@ -33,11 +38,12 @@ def test_update_exif(exif_incomplete_photo):
     assert nearly_equals(ph.altitude, gps[2])
 
 
+@pytest.mark.skipif(which("exiftool") is None, reason="requires the exiftool binary")
+@pytest.mark.network
 def test_convert_raw(raw_photo):
     ph = convert_raw(raw_photo)
     print(ph.local_path)
     coords = get_coords("Strandvejen 154A, 8410, Danmark")
-    address = coords[3]
     coords = (coords[0], coords[1], coords[2])
     update_exif(ph.local_path, gps=coords)
     updated_ph = LocalPhoto.from_file(ph.local_path)

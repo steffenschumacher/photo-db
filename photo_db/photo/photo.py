@@ -1,20 +1,32 @@
-from os.path import join, splitext
-from datetime import timezone
+from datetime import UTC, datetime
+from io import BytesIO
+from os.path import join
 from uuid import uuid4
-from exifread import process_file
+
 import numpy as np
-from pydantic import BaseModel, PrivateAttr
-from .parsers import *
+from exifread import process_file
+from imagehash import ImageHash
 from PIL import UnidentifiedImageError
+from pydantic import BaseModel, PrivateAttr
+
+from photo_db.config import Config
+
+from .parsers import (
+    image_hash_from,
+    parse_camera,
+    parse_date,
+    parse_ext_hash_dimensions,
+    parse_gps,
+)
 
 
 class Photo(BaseModel):
-    uuid: str = None
+    uuid: str | None = None
     camera: str
     date: datetime
-    latitude: float = None
-    longitude: float = None
-    altitude: float = None
+    latitude: float | None = None
+    longitude: float | None = None
+    altitude: float | None = None
     width: int
     height: int
     hash: str
@@ -34,11 +46,11 @@ class Photo(BaseModel):
         for k in ["date", "scanned"]:
             if dt_val := data.pop(k, None):
                 if isinstance(dt_val, float):
-                    dt_val = datetime.fromtimestamp(dt_val, tz=timezone.utc)
+                    dt_val = datetime.fromtimestamp(dt_val, tz=UTC)
                 data[k] = dt_val
         super().__init__(**data)
         if not self.date.tzinfo:
-            self.date = self.date.replace(tzinfo=timezone.utc)
+            self.date = self.date.replace(tzinfo=UTC)
         # We generate the value for our private attribute
         if len(self.hash.split("-")) < 4:
             self._img_hash = image_hash_from(self.hash)
@@ -83,7 +95,7 @@ class Photo(BaseModel):
         try:
             if isinstance(img_file, BytesIO):
                 if not path:
-                    raise ValueError(f"Missing path arg with BytesIO")
+                    raise ValueError("Missing path arg with BytesIO")
                 tags = process_file(img_file)
             elif isinstance(img_file, str):
                 path = img_file
@@ -107,7 +119,7 @@ class Photo(BaseModel):
             }
             return Photo(**args)
         except UnidentifiedImageError as uie:
-            raise ValueError(f"Not a valid photo: {uie}")
+            raise ValueError(f"Not a valid photo: {uie}") from uie
 
     @property
     def path(self) -> str:
@@ -135,10 +147,10 @@ class Photo(BaseModel):
 
 
 class LocalPhoto(Photo):
-    local_path: str = None
-    reject_reason: str = None
-    duplicate_uuid: str = None
-    duplicate_src: str = None
+    local_path: str | None = None
+    reject_reason: str | None = None
+    duplicate_uuid: str | None = None
+    duplicate_src: str | None = None
     status: str = "detected"
 
     def __init__(self, **data):
@@ -148,7 +160,10 @@ class LocalPhoto(Photo):
     @classmethod
     def from_file(cls, img_file: BytesIO | str, path: str = None) -> "LocalPhoto":
         ph = super().from_file(img_file, path)
-        return LocalPhoto(**ph.dict(), path=ph.path)
+        return LocalPhoto(**ph.model_dump(), path=ph.path)
 
     def __str__(self):
-        return f"LocPhoto({self.local_path}, {self.width}x{self.height}, {self.date.date()}, {self.camera}, {self.status}, {self.reject_reason})"
+        return (
+            f"LocPhoto({self.local_path}, {self.width}x{self.height}, "
+            f"{self.date.date()}, {self.camera}, {self.status}, {self.reject_reason})"
+        )

@@ -1,6 +1,5 @@
 import typing
 
-
 SPECIAL_TYPE = [typing.Any, typing.Literal, typing.Union]
 
 MOV_EXTENTIONS = ["mov", "avi", "mp4", "mpeg"]

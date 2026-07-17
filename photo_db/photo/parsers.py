@@ -1,10 +1,12 @@
+from base64 import b64decode, b64encode
 from datetime import datetime
 from io import BytesIO
-from PIL import Image, ImageOps
+
+from imagehash import ImageHash, average_hash
+from numpy import dtype, frombuffer
+from PIL import Image
 from pillow_heif import register_heif_opener
-from imagehash import average_hash, ImageHash
-from base64 import b64encode, b64decode
-from numpy import ndarray, frombuffer, dtype
+
 from photo_db.config import Config
 
 register_heif_opener()
@@ -21,10 +23,8 @@ def parse_date(tags: dict[str, object], image_descr: str) -> datetime:
         if value := tags.get(tag):
             try:
                 return datetime.strptime(str(value), fmt)
-            except ValueError as ve:
-                print(
-                    f"{image_descr}: has unexpected datetime format ({value}) in tag {tag}"
-                )
+            except ValueError:
+                print(f"{image_descr}: has unexpected datetime format ({value}) in tag {tag}")
     raise ValueError(f"{image_descr}: Unable to parse datetime")
 
 
@@ -41,9 +41,9 @@ def parse_gps(tags: dict[str, object], image_descr: str) -> (float, float, float
     results = {}
     try:
         for key in ["Latitude", "Longitude"]:
-            multiplier = 1 if tags[f"GPS GPS{key}Ref"] in ["N", "E"] else -1
+            multiplier = 1 if tags[f"GPS GPS{key}Ref"].values[0] in ["N", "E"] else -1
             values = tags[f"GPS GPS{key}"].values
-            results[key] = (
+            results[key] = multiplier * (
                 float(values[0]) + float(values[1]) / 60.0 + float(values[2]) / 3600.0
             )
         if alt := tags.get("GPS GPSAltitude"):
@@ -51,7 +51,7 @@ def parse_gps(tags: dict[str, object], image_descr: str) -> (float, float, float
         else:
             results["Altitude"] = 0
         return results["Latitude"], results["Longitude"], results["Altitude"]
-    except Exception as err:
+    except Exception:
         print(f"{image_descr}: has unparsable GPS coordinates")
 
     raise ValueError(f"{image_descr}: Unable to parse GPS")

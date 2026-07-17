@@ -1,6 +1,4 @@
-from geopy.geocoders.nominatim import Nominatim, Location
-from geopy.format import format_degrees
-
+from geopy.geocoders.nominatim import Location, Nominatim
 
 _client = None
 

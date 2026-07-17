@@ -1,4 +1,5 @@
 from flask import Flask
+
 from photo_db.api.web_store import add_routes
 
 

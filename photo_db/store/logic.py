@@ -1,12 +1,11 @@
 from io import BytesIO
-from os import makedirs, chown
-from os.path import join, exists, sep
-from numpy import ndarray, count_nonzero
+from os import chown, makedirs
+from os.path import exists, join, sep
 
-from ..api import *
-from ..db import store as db
-from ..photo import Photo, image_hash_from
+from ..api import DuplicateException, SimilarException
 from ..config import Config
+from ..db import store as db
+from ..photo import Photo
 
 if not exists(Config.STORE_URL):
     makedirs(Config.STORE_URL)
@@ -24,9 +23,7 @@ class LocalStore:
             if ph.similar_to_hash(ext_hash):
                 existing = db.get_photo(uuid)
                 if existing.preferable_to(ph):
-                    raise SimilarException(
-                        uuid, tpl.format("too similar to preferable")
-                    )
+                    raise SimilarException(uuid, tpl.format("too similar to preferable"))
         db.insert_photo(ph)
 
     @classmethod

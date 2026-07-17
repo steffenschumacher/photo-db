@@ -1,14 +1,22 @@
-from pytest import fixture
 import shutil
 import tempfile
 from os import makedirs
 from os.path import join
+from pathlib import Path
 from unittest import mock
 
+from pytest import fixture
+
 from photo_db.app import create_app
-from photo_db.client import WebPDBClient, LocalPDBClient
+from photo_db.client import LocalPDBClient, WebPDBClient
 from photo_db.config import Config
 from photo_db.db import store as store_db
+
+# Fixture images live alongside this file, not relative to the process's
+# current working directory - resolve absolutely so tests pass regardless of
+# where `pytest` is invoked from (see docs/PROJECT_STATUS_AND_PLAN.md, "Test
+# suite: current real state").
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 class RequestsClient:
@@ -60,7 +68,7 @@ def local_store_client():
 def exif_incomplete_photo() -> str:
     filename = "25-121007-33d0.jpeg"
     temp_dir = tempfile.mkdtemp()
-    x = shutil.copyfile(join("static", filename), join(temp_dir, filename))
+    x = shutil.copyfile(STATIC_DIR / filename, join(temp_dir, filename))
     yield x
 
 
@@ -68,7 +76,7 @@ def exif_incomplete_photo() -> str:
 def raw_photo() -> str:
     filename = "15175111__DSC04832.ARW"
     temp_dir = tempfile.mkdtemp()
-    x = shutil.copyfile(join("static", filename), join(temp_dir, filename))
+    x = shutil.copyfile(STATIC_DIR / filename, join(temp_dir, filename))
     yield x
 
 

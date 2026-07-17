@@ -1,7 +1,6 @@
-import time
-from os.path import join
 from datetime import datetime
-from sqlite3 import connect, Connection, OperationalError
+from os.path import join
+from sqlite3 import Connection, connect
 
 from ..config import Config
 from ..photo import Photo
@@ -26,9 +25,7 @@ def init_store_db():
     global _table
     c = _cnx()
     try:
-        cur = c.execute(
-            """SELECT name FROM sqlite_master WHERE type='table' AND name='photo';"""
-        )
+        cur = c.execute("""SELECT name FROM sqlite_master WHERE type='table' AND name='photo';""")
         result = cur.fetchone()
         if result is None:
             fields = ",".join([f"{f} {d}" for f, d in _table.items()])
