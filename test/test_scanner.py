@@ -35,8 +35,8 @@ def test_is_possible_image_ignores_missing_and_appledouble_files(tmp_path):
     assert not sc.is_possible_image(str(apple_double))
 
 
-def test_scan(local_store_client, clean_store):
-    sc = Scanner(local_store_client)
+def test_scan(local_store_client, clean_store, test_config):
+    sc = Scanner(local_store_client, config=test_config)
 
     folder = str(STATIC_DIR)
     sc.scan_dir(folder)

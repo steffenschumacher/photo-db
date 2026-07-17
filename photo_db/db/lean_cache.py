@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from os import makedirs
 from os.path import dirname, exists
 from sqlite3 import Connection, connect
+from threading import Lock
 
 from ..config import Config, default_config
 
@@ -58,20 +59,27 @@ class LeanCache:
         db_dir = dirname(config.LEAN_CACHE_PATH)
         if db_dir and not exists(db_dir):
             makedirs(db_dir)
-        self.cnx: Connection = connect(config.LEAN_CACHE_PATH)
+        # Scanner uses this cache from multiple ThreadPoolExecutor worker
+        # threads (as well as the main thread), so allow cross-thread use
+        # and serialize actual access with a lock - sqlite3 connections
+        # aren't safe for concurrent simultaneous use even when
+        # check_same_thread is disabled.
+        self.cnx: Connection = connect(config.LEAN_CACHE_PATH, check_same_thread=False)
+        self._lock = Lock()
         self._init_db()
 
     def _init_db(self) -> None:
-        cur = self.cnx.execute(
-            """SELECT name FROM sqlite_master WHERE type='table' AND name='lean_photo';"""
-        )
-        if cur.fetchone() is None:
-            fields = ",".join([f"{f} {d}" for f, d in _table.items()])
-            self.cnx.execute(f"CREATE TABLE IF NOT EXISTS lean_photo ({fields});")
-            self.cnx.execute("CREATE INDEX index_lean_hash ON lean_photo(hash);")
-            self.cnx.execute("CREATE INDEX index_lean_date ON lean_photo(date);")
-        self.cnx.execute(_meta_table_ddl)
-        self.cnx.commit()
+        with self._lock:
+            cur = self.cnx.execute(
+                """SELECT name FROM sqlite_master WHERE type='table' AND name='lean_photo';"""
+            )
+            if cur.fetchone() is None:
+                fields = ",".join([f"{f} {d}" for f, d in _table.items()])
+                self.cnx.execute(f"CREATE TABLE IF NOT EXISTS lean_photo ({fields});")
+                self.cnx.execute("CREATE INDEX index_lean_hash ON lean_photo(hash);")
+                self.cnx.execute("CREATE INDEX index_lean_date ON lean_photo(date);")
+            self.cnx.execute(_meta_table_ddl)
+            self.cnx.commit()
 
     def upsert_many(self, rows: list[dict]) -> None:
         if not rows:
@@ -82,32 +90,37 @@ class LeanCache:
             tuple(int(row[f]) if f in ("date", "scanned") else row[f] for f in _fields)
             for row in rows
         ]
-        self.cnx.executemany(stmt, values)
-        self.cnx.commit()
+        with self._lock:
+            self.cnx.executemany(stmt, values)
+            self.cnx.commit()
 
     def last_synced(self) -> float | None:
-        cur = self.cnx.execute("SELECT last_synced FROM sync_meta WHERE id = 0;")
-        row = cur.fetchone()
-        return row[0] if row else None
+        with self._lock:
+            cur = self.cnx.execute("SELECT last_synced FROM sync_meta WHERE id = 0;")
+            row = cur.fetchone()
+            return row[0] if row else None
 
     def set_last_synced(self, timestamp: float) -> None:
-        self.cnx.execute(
-            "INSERT INTO sync_meta (id, last_synced) VALUES (0, ?) "
-            "ON CONFLICT(id) DO UPDATE SET last_synced = excluded.last_synced;",
-            (timestamp,),
-        )
-        self.cnx.commit()
+        with self._lock:
+            self.cnx.execute(
+                "INSERT INTO sync_meta (id, last_synced) VALUES (0, ?) "
+                "ON CONFLICT(id) DO UPDATE SET last_synced = excluded.last_synced;",
+                (timestamp,),
+            )
+            self.cnx.commit()
 
     def is_known_hash(self, hash_: str) -> str | None:
         """Return the uuid already stored for ``hash_``, or ``None`` if not
         present locally - the cheap, no-network duplicate pre-check."""
-        cur = self.cnx.execute("SELECT uuid FROM lean_photo WHERE hash = ?;", (hash_,))
-        row = cur.fetchone()
-        return row[0] if row else None
+        with self._lock:
+            cur = self.cnx.execute("SELECT uuid FROM lean_photo WHERE hash = ?;", (hash_,))
+            row = cur.fetchone()
+            return row[0] if row else None
 
     def hashes(self) -> dict[str, str]:
-        cur = self.cnx.execute("SELECT hash, uuid FROM lean_photo;")
-        return {r[0]: r[1] for r in cur}
+        with self._lock:
+            cur = self.cnx.execute("SELECT hash, uuid FROM lean_photo;")
+            return {r[0]: r[1] for r in cur}
 
     def query_by_month(self, year: int, month: int) -> list[dict]:
         """Return lean rows whose capture ``date`` falls within the given
@@ -119,25 +132,29 @@ class LeanCache:
             end = datetime(year + 1, 1, 1, tzinfo=UTC)
         else:
             end = datetime(year, month + 1, 1, tzinfo=UTC)
-        cur = self.cnx.execute(
-            f"{_select} WHERE date >= ? AND date < ? ORDER BY date ASC;",
-            (int(start.timestamp()), int(end.timestamp())),
-        )
-        return [dict(zip(_fields, r, strict=True)) for r in cur]
+        with self._lock:
+            cur = self.cnx.execute(
+                f"{_select} WHERE date >= ? AND date < ? ORDER BY date ASC;",
+                (int(start.timestamp()), int(end.timestamp())),
+            )
+            return [dict(zip(_fields, r, strict=True)) for r in cur]
 
     def available_months(self) -> list[tuple[int, int]]:
         """Distinct (year, month) pairs present in the cache, for populating
         a year/month picker without scanning every row from the UI layer."""
-        cur = self.cnx.execute("SELECT DISTINCT date FROM lean_photo ORDER BY date ASC;")
+        with self._lock:
+            cur = self.cnx.execute("SELECT DISTINCT date FROM lean_photo ORDER BY date ASC;")
+            rows = cur.fetchall()
         months = set()
-        for (ts,) in cur:
+        for (ts,) in rows:
             d = datetime.fromtimestamp(ts, tz=UTC)
             months.add((d.year, d.month))
         return sorted(months)
 
     def count(self) -> int:
-        cur = self.cnx.execute("SELECT COUNT(*) FROM lean_photo;")
-        return cur.fetchone()[0]
+        with self._lock:
+            cur = self.cnx.execute("SELECT COUNT(*) FROM lean_photo;")
+            return cur.fetchone()[0]
 
     def sync(self, client, page_limit: int = 5000) -> int:
         """Pull lean rows from ``client`` (any ``AbstractPDBClient``,

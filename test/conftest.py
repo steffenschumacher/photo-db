@@ -37,7 +37,8 @@ class RequestsClient:
 def test_config() -> Config:
     """A Config instance isolated to a fresh temp directory for the test session."""
     temp_dir = tempfile.mkdtemp()
-    return Config(store_url=temp_dir)
+    lean_cache_dir = tempfile.mkdtemp()
+    return Config(store_url=temp_dir, lean_cache_path=join(lean_cache_dir, "lean_cache.db"))
 
 
 @fixture(scope="session")

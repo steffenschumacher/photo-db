@@ -13,6 +13,7 @@ from photo_db.api import DuplicateException, SimilarException
 from photo_db.client import AbstractPDBClient, init_client
 from photo_db.config import Config, default_config
 from photo_db.constants import IGNORABLE_EXTS
+from photo_db.db.lean_cache import LeanCache
 from photo_db.db.scanner import ScanDB
 from photo_db.photo import LocalPhoto, Photo
 
@@ -25,7 +26,12 @@ class Scanner:
     client: AbstractPDBClient = None
     pool: ThreadPoolExecutor
 
-    def __init__(self, client: AbstractPDBClient = None, config: Config = default_config):
+    def __init__(
+        self,
+        client: AbstractPDBClient = None,
+        config: Config = default_config,
+        lean_cache: LeanCache = None,
+    ):
         self.config = config
         self.client: AbstractPDBClient = client or init_client(config=config)
         self.pool = ThreadPoolExecutor(4)
@@ -33,12 +39,20 @@ class Scanner:
         self.processed = 0
         self.detected = 0
         self.start = None
-        self._chs = self.pool.submit(self.client.hashes)
+        # The lean cache is synced incrementally (only what changed since
+        # our last sync) rather than fully re-fetching hash->uuid on every
+        # scan, and is persisted locally so subsequent scans start warm.
+        self.lean_cache = lean_cache or LeanCache(config=config)
+        self._chs = self.pool.submit(self._load_central_hashes)
         self._chs_lock = Lock()
         self.scan_hashes: dict[str, LocalPhoto] = {}
         self.sh_lock = Lock()
         self.ch_lock = Lock()
         self.db = ScanDB(config=config)
+
+    def _load_central_hashes(self) -> dict[str, str]:
+        self.lean_cache.sync(self.client)
+        return self.lean_cache.hashes()
 
     @property
     def central_hashes(self) -> dict[str, str]:
@@ -198,6 +212,15 @@ class Scanner:
                 ph.status = "uploaded"
                 with self.ch_lock:
                     self.central_hashes[ph.hash] = ph.uuid
+                    # Keep the lean cache warm with this scan session's own
+                    # uploads so later files in the same scan (and future
+                    # scans, before their next full sync) see it as a known
+                    # duplicate without waiting on a server round trip. The
+                    # `scanned` value here is the client's clock rather
+                    # than the server's; it gets corrected transparently
+                    # the next time LeanCache.sync() pulls the authoritative
+                    # row (upserts are keyed by uuid).
+                    self.lean_cache.upsert_many([ph.lean_dict()])
             return True
         except (DuplicateException, SimilarException) as de:
             ph.duplicate_src = "central"
