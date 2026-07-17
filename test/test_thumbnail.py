@@ -63,6 +63,27 @@ def test_local_store_backfills_missing_thumbnail(local_store_client, clean_store
     assert os.path.exists(thumb_path)
 
 
+def test_local_store_rotate_regenerates_thumbnail_with_new_orientation(
+    local_store_client, clean_store
+):
+    """Regression test: LocalStore.rotate() must bake the new rotation into
+    the regenerated thumbnail, not just the full-size ``get_display_bytes``
+    path - otherwise the thumbnail grid keeps showing the old orientation
+    after a manual rotate."""
+    uuid = local_store_client.upload(_sample_bytes())
+    thumb_before = local_store_client.get_thumbnail(uuid)
+    with Image.open(BytesIO(thumb_before)) as img:
+        size_before = img.size
+
+    local_store_client.rotate(uuid, 90)
+
+    thumb_after = local_store_client.get_thumbnail(uuid)
+    with Image.open(BytesIO(thumb_after)) as img:
+        size_after = img.size
+
+    assert size_after == (size_before[1], size_before[0])
+
+
 def test_web_client_fetch_thumbnail(web_client, clean_store):
     uuid = web_client.upload(_sample_bytes())
     thumb = web_client.get_thumbnail(uuid)

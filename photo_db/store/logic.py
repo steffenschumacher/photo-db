@@ -163,7 +163,7 @@ class LocalStore:
         if not exists(thumb_dir):
             makedirs(thumb_dir)
         with open(path, "wb") as thumb_file:
-            thumb_file.write(generate_thumbnail(photo))
+            thumb_file.write(generate_thumbnail(photo, rotation=ph.rotation))
 
     def get_thumbnail(self, ph: Photo) -> bytes:
         """Return the cached thumbnail for ``ph``, regenerating it on the
