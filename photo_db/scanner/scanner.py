@@ -11,31 +11,34 @@ from uuid import uuid4
 
 from photo_db.api import DuplicateException, SimilarException
 from photo_db.client import AbstractPDBClient, init_client
+from photo_db.config import Config, default_config
 from photo_db.constants import IGNORABLE_EXTS
 from photo_db.db.scanner import ScanDB
 from photo_db.photo import LocalPhoto, Photo
 
 _ignore_pat = compile(r".*(\.AppleDouble).*", IGNORECASE)
-_consider_pat = compile(r"\S+\.(jpg|jepg|heic)", IGNORECASE)
+_consider_pat = compile(r"\S+\.(jpg|jepg|heic|arw)", IGNORECASE)
+_raw_pat = compile(r"\S+\.arw", IGNORECASE)
 
 
 class Scanner:
     client: AbstractPDBClient = None
     pool: ThreadPoolExecutor
 
-    def __init__(self, client: AbstractPDBClient = None):
-        self.client: AbstractPDBClient = client or init_client()
+    def __init__(self, client: AbstractPDBClient = None, config: Config = default_config):
+        self.config = config
+        self.client: AbstractPDBClient = client or init_client(config=config)
         self.pool = ThreadPoolExecutor(4)
         self.futures = deque()
         self.processed = 0
         self.detected = 0
         self.start = None
-        self._chs = self.pool.submit(client.hashes)
+        self._chs = self.pool.submit(self.client.hashes)
         self._chs_lock = Lock()
         self.scan_hashes: dict[str, LocalPhoto] = {}
         self.sh_lock = Lock()
         self.ch_lock = Lock()
-        self.db = ScanDB()
+        self.db = ScanDB(config=config)
 
     @property
     def central_hashes(self) -> dict[str, str]:
@@ -98,7 +101,12 @@ class Scanner:
     def process_image(self, path: str, file: str, pre_check_hash=True):
         full = join(path, file)
         try:
-            ph = LocalPhoto.from_file(full)
+            if _raw_pat.search(full.lower()):
+                from photo_db.photo.arw_converter import convert_raw
+
+                ph = convert_raw(full, self.config)
+            else:
+                ph = LocalPhoto.from_file(full, config=self.config)
             if not ph.camera or not ph.latitude or not ph.longitude or not ph.date:
                 ph.latitude = ph.latitude or 0
                 ph.longitude = ph.longitude or 0
@@ -115,8 +123,11 @@ class Scanner:
                 ph.reject_reason = f"Incomplete EXIF data ({'+'.join(reasons)})"
                 ph.status = "exif"
                 return ph
-        except ValueError as ve:
+        except (ValueError, ImportError, ModuleNotFoundError) as ve:
             print(f"{file} is not a valid photo - skipping: {ve}")
+            reason = ve.args[0].split(": ")[-1] if ve.args else str(ve)
+            if isinstance(ve, ImportError | ModuleNotFoundError):
+                reason = f"RAW conversion unavailable ({reason}) - install the 'raw' extra"
             dummy_args = {
                 "path": full,
                 "camera": "Unknown",
@@ -125,7 +136,7 @@ class Scanner:
                 "height": 0,
                 "hash": str(uuid4()),
                 "extension": full.split(sep)[-1],
-                "reject_reason": ve.args[0].split(": ")[-1],
+                "reject_reason": reason,
                 "status": "ignored",
             }
             return LocalPhoto(**dummy_args)
@@ -165,7 +176,7 @@ class Scanner:
                 ph.duplicate_uuid = existing
                 ph.reject_reason = "identical to imported photo"
                 ph.status = "duplicate"
-                return ph
+                return False
             for central_hash, uuid in self.central_hashes.items():
                 if ph.similar_to_hash(central_hash):
                     other: Photo = self.client.get_meta(uuid)
@@ -174,7 +185,7 @@ class Scanner:
                         ph.duplicate_uuid = uuid
                         ph.reject_reason = "too similar to imported photo"
                         ph.status = "similar"
-                        return ph
+                        return False
                     else:
                         ph.duplicate_src = "central"
                         ph.duplicate_uuid = uuid
@@ -187,12 +198,13 @@ class Scanner:
                 ph.status = "uploaded"
                 with self.ch_lock:
                     self.central_hashes[ph.hash] = ph.uuid
+            return True
         except (DuplicateException, SimilarException) as de:
             ph.duplicate_src = "central"
             ph.duplicate_uuid = de.uuid
             ph.reject_reason = de.description
             ph.status = "rejected"
-        return True
+            return False
 
     def is_possible_image(self, abs_file: str) -> bool:
         if not isfile(abs_file):

@@ -9,7 +9,7 @@ from imagehash import ImageHash
 from PIL import UnidentifiedImageError
 from pydantic import BaseModel, PrivateAttr
 
-from photo_db.config import Config
+from photo_db.config import Config, default_config
 
 from .parsers import (
     image_hash_from,
@@ -35,6 +35,7 @@ class Photo(BaseModel):
     #
     _img_hash: ImageHash = PrivateAttr()
     _path: str = PrivateAttr()
+    _config: Config = PrivateAttr()
 
     def __str__(self):
         return f"Photo({self.db_path()}, {self.width}x{self.height}, {self.date}, {self.camera})"
@@ -43,6 +44,7 @@ class Photo(BaseModel):
         data.setdefault("uuid", str(uuid4()))
         data.setdefault("scanned", datetime.now())
         path = data.pop("path", None)
+        config = data.pop("config", None) or default_config
         for k in ["date", "scanned"]:
             if dt_val := data.pop(k, None):
                 if isinstance(dt_val, float):
@@ -51,9 +53,10 @@ class Photo(BaseModel):
         super().__init__(**data)
         if not self.date.tzinfo:
             self.date = self.date.replace(tzinfo=UTC)
+        self._config = config
         # We generate the value for our private attribute
         if len(self.hash.split("-")) < 4:
-            self._img_hash = image_hash_from(self.hash)
+            self._img_hash = image_hash_from(self.hash, config)
         self._path = path
 
     def similar_to(self, other: "Photo") -> bool:
@@ -63,12 +66,12 @@ class Photo(BaseModel):
 
     def similar_to_hash(self, hash: str | np.ndarray) -> bool:
         if isinstance(hash, str):
-            nd_hash = image_hash_from(hash).hash
+            nd_hash = image_hash_from(hash, self._config).hash
         elif isinstance(hash, np.ndarray):
             nd_hash = hash
         else:
             raise ValueError(f"Invalid hash: {hash} - type: {type(hash)}")
-        return np.count_nonzero(self._img_hash.hash != nd_hash) <= Config.diff_limit()
+        return np.count_nonzero(self._img_hash.hash != nd_hash) <= self._config.diff_limit()
 
     def preferable_to(self, other: "Photo") -> bool:
         """
@@ -91,7 +94,7 @@ class Photo(BaseModel):
         return super().__eq__(other)
 
     @classmethod
-    def from_file(cls, img_file: BytesIO | str, path: str = None):
+    def from_file(cls, img_file: BytesIO | str, path: str = None, config: Config = default_config):
         try:
             if isinstance(img_file, BytesIO):
                 if not path:
@@ -104,7 +107,7 @@ class Photo(BaseModel):
             else:
                 raise ValueError(f"{img_file} is not a valid type: {type(img_file)}")
             la, lo, al = parse_gps(tags, path)
-            ext, str_hash, x, y = parse_ext_hash_dimensions(img_file)
+            ext, str_hash, x, y = parse_ext_hash_dimensions(img_file, config)
             args = {
                 "camera": parse_camera(tags, path),
                 "date": parse_date(tags, path),
@@ -116,6 +119,7 @@ class Photo(BaseModel):
                 "height": y,
                 "path": path,
                 "extension": ext,
+                "config": config,
             }
             return Photo(**args)
         except UnidentifiedImageError as uie:
@@ -163,9 +167,11 @@ class LocalPhoto(Photo):
         self.local_path = self.path
 
     @classmethod
-    def from_file(cls, img_file: BytesIO | str, path: str = None) -> "LocalPhoto":
-        ph = super().from_file(img_file, path)
-        return LocalPhoto(**ph.model_dump(), path=ph.path)
+    def from_file(
+        cls, img_file: BytesIO | str, path: str = None, config: Config = default_config
+    ) -> "LocalPhoto":
+        ph = super().from_file(img_file, path, config)
+        return LocalPhoto(**ph.model_dump(), path=ph.path, config=config)
 
     def __str__(self):
         return (

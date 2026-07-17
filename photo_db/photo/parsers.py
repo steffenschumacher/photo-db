@@ -7,7 +7,7 @@ from numpy import dtype, frombuffer
 from PIL import Image
 from pillow_heif import register_heif_opener
 
-from photo_db.config import Config
+from photo_db.config import Config, default_config
 
 register_heif_opener()
 
@@ -59,16 +59,17 @@ def parse_gps(tags: dict[str, object], image_descr: str) -> (float, float, float
 
 def parse_ext_hash_dimensions(
     img_data: BytesIO,
+    config: Config = default_config,
 ) -> (str, str, int, int):  # b64 encoded hash + dimensions
     with Image.open(img_data) as img:
         img_ext = img.get_format_mimetype().split("/")[-1]
-        img_hash = average_hash(img, Config.HASH_SIZE)
+        img_hash = average_hash(img, config.HASH_SIZE)
         str_hash = b64encode(img_hash.hash.tobytes()).decode("utf-8")
         return img_ext, str_hash, img.width, img.height
 
 
-def image_hash_from(b64str: str) -> ImageHash:
+def image_hash_from(b64str: str, config: Config = default_config) -> ImageHash:
     raw_bytes = b64decode(b64str)
     one_d = frombuffer(raw_bytes, dtype=dtype(bool))
-    two_d = one_d.reshape(Config.HASH_SIZE, Config.HASH_SIZE)
+    two_d = one_d.reshape(config.HASH_SIZE, config.HASH_SIZE)
     return ImageHash(two_d)

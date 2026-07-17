@@ -2,6 +2,7 @@
 import argparse
 from time import sleep, time
 
+from photo_db.client import init_client
 from photo_db.config import Config
 
 if __name__ == "__main__":
@@ -27,23 +28,26 @@ if __name__ == "__main__":
         help="Local path of image db or url for webservice",
     )
     parser.add_argument("-u", "--user", dest="user", default=None, help="username for webservice")
-    parser.add_argument("-p", "--password", dest="pw", default=None, help="password for webservice")
+    parser.add_argument(
+        "-p", "--password", dest="password", default=None, help="password for webservice"
+    )
     args = parser.parse_args()
-    if args.libpath:
-        Config.STORE_URL = args.libpath
-    if args.user:
-        Config.STORE_USER = args.user
-        if not args.pw:
-            raise argparse.ArgumentError("Missing password with provided user?")
-    if args.pw:
-        Config.STORE_PASS = args.pw
-        if not args.pw:
-            raise argparse.ArgumentError("Missing user with provided password?")
+    if args.user and not args.password:
+        raise argparse.ArgumentError(None, "Missing password with provided user?")
+    if args.password and not args.user:
+        raise argparse.ArgumentError(None, "Missing user with provided password?")
+
+    config = Config(
+        store_url=args.libpath,
+        store_user=args.user,
+        store_pass=args.password,
+    )
     from photo_db.scanner import Scanner
 
-    sc = Scanner()
+    client = init_client(config=config)
+    sc = Scanner(client)
     t1 = time()
-    print(Config.info())
+    print(config.info())
     sc.scan_dir(args.scanpath)
     while not sc.uploading_complete(blocking=False, verbose=True):
         sleep(1)

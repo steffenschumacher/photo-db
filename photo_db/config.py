@@ -8,38 +8,58 @@ load_dotenv()
 
 
 class Config:
-    STORE_URL = env.str("PH_STORE_URL", "/photodb").rstrip("/")
-    SSL_VERIFY = env.bool("PH_SSL_VERIFY", False)
-    STORE_USER = env.str("PH_STORE_USER", None)
-    STORE_PASS = env.str("PH_STORE_PASS", None)
-    # https://medium.com/@somilshah112/how-to-find-duplicate-or-similar-images-quickly-with-python-2d636af9452f
-    HASH_SIZE = env.int("PH_HASH_SIZE", 70)
-    SIMILARITY = env.int("PH_SIMILARITY", 97)
-    FILE_UID = env.int("PH_UID", None)
-    FILE_GID = env.int("PH_GID", None)
-    _TEMP_FOLDER = None
+    """Application configuration.
 
-    @classmethod
-    def diff_limit(cls):
-        hs = cls.HASH_SIZE
-        if 1 <= cls.SIMILARITY <= 99:
-            return int((1 - cls.SIMILARITY / 100) * (hs**2))
-        raise ValueError(f"Invalid similarity: {cls.SIMILARITY}")
+    Instantiate explicitly (``Config()``) to read fresh values from the
+    environment, or pass explicit keyword arguments to override individual
+    settings (handy for tests / multiple stores in the same process). Values
+    are captured at construction time rather than read from mutable class
+    attributes, so each ``Config`` instance is independent and safe to pass
+    around via dependency injection instead of relying on a shared global.
+    """
 
-    @classmethod
-    def temp_folder(cls) -> str:
-        if cls._TEMP_FOLDER is None:
-            cls._TEMP_FOLDER = tempfile.mkdtemp(prefix="photodb_import")
-        return cls._TEMP_FOLDER
+    def __init__(
+        self,
+        store_url: str | None = None,
+        ssl_verify: bool | None = None,
+        store_user: str | None = None,
+        store_pass: str | None = None,
+        hash_size: int | None = None,
+        similarity: int | None = None,
+        file_uid: int | None = None,
+        file_gid: int | None = None,
+    ):
+        self.STORE_URL = (
+            store_url if store_url is not None else env.str("PH_STORE_URL", "/photodb")
+        ).rstrip("/")
+        self.SSL_VERIFY = ssl_verify if ssl_verify is not None else env.bool("PH_SSL_VERIFY", False)
+        self.STORE_USER = store_user if store_user is not None else env.str("PH_STORE_USER", None)
+        self.STORE_PASS = store_pass if store_pass is not None else env.str("PH_STORE_PASS", None)
+        # https://medium.com/@somilshah112/how-to-find-duplicate-or-similar-images-quickly-with-python-2d636af9452f
+        self.HASH_SIZE = hash_size if hash_size is not None else env.int("PH_HASH_SIZE", 70)
+        self.SIMILARITY = similarity if similarity is not None else env.int("PH_SIMILARITY", 97)
+        self.FILE_UID = file_uid if file_uid is not None else env.int("PH_UID", None)
+        self.FILE_GID = file_gid if file_gid is not None else env.int("PH_GID", None)
+        self._temp_folder: str | None = None
 
-    @classmethod
-    def info(cls) -> str:
+    def diff_limit(self) -> int:
+        hs = self.HASH_SIZE
+        if 1 <= self.SIMILARITY <= 99:
+            return int((1 - self.SIMILARITY / 100) * (hs**2))
+        raise ValueError(f"Invalid similarity: {self.SIMILARITY}")
+
+    def temp_folder(self) -> str:
+        if self._temp_folder is None:
+            self._temp_folder = tempfile.mkdtemp(prefix="photodb_import")
+        return self._temp_folder
+
+    def info(self) -> str:
         kvs = {
-            "url": cls.STORE_URL,
-            "user": cls.STORE_USER,
-            "pw": "***" if cls.STORE_PASS else None,
-            "hash": cls.HASH_SIZE,
-            "similarity": cls.SIMILARITY,
+            "url": self.STORE_URL,
+            "user": self.STORE_USER,
+            "pw": "***" if self.STORE_PASS else None,
+            "hash": self.HASH_SIZE,
+            "similarity": self.SIMILARITY,
         }
         strings = [f"{k}: {v}" for k, v in kvs.items()]
 
@@ -47,4 +67,10 @@ class Config:
         return msg
 
 
-__all__ = ["Config"]
+# Default, process-wide instance built from environment variables at import
+# time. Entry points (manage.py, pdbscanner.py, app.py) use this by default;
+# pass an explicit Config instance anywhere dependency injection is wanted
+# (e.g. tests constructing their own Config with overrides).
+default_config = Config()
+
+__all__ = ["Config", "default_config"]

@@ -2,7 +2,7 @@ from os.path import dirname, exists, join
 
 import wx
 
-from photo_db.config import Config
+from photo_db.config import default_config
 from photo_db.scanner.scanner import Scanner
 
 
@@ -34,8 +34,8 @@ class ScanInitDialog(wx.Dialog):
         lb_ip = wx.StaticText(pnl, label="Store path/url")
         hBoxStPath.Add(lb_ip, flag=wx.EXPAND | wx.ALL, border=10)
         self.store_uri = wx.TextCtrl(pnl, wx.ID_STATIC, "", size=(460, 22))
-        if Config.STORE_URL:
-            self.store_uri.SetValue(Config.STORE_URL)
+        if default_config.STORE_URL:
+            self.store_uri.SetValue(default_config.STORE_URL)
         hBoxStPath.Add(self.store_uri, flag=wx.EXPAND | wx.ALL, border=10)
         hBoxStPath.Add(wx.Button(pnl, 4, "&Select"), flag=wx.ALL, border=10)
         vBox.Add(hBoxStPath, flag=wx.ALL | wx.ALIGN_LEFT, border=10)
@@ -46,15 +46,15 @@ class ScanInitDialog(wx.Dialog):
         lb_us = wx.StaticText(pnl, label="Username for webservice")
         hBoxCred.Add(lb_us, flag=wx.EXPAND | wx.ALL, border=10)
         self.store_user = wx.TextCtrl(pnl, wx.ID_STATIC, "", size=(160, 22))
-        if Config.STORE_USER:
-            self.store_user.SetValue(Config.STORE_USER)
+        if default_config.STORE_USER:
+            self.store_user.SetValue(default_config.STORE_USER)
         hBoxCred.Add(self.store_user, flag=wx.EXPAND | wx.ALL, border=10)
 
         lb_pw = wx.StaticText(pnl, label="Password")
         hBoxCred.Add(lb_pw, flag=wx.EXPAND | wx.ALL, border=10)
         self.store_pw = wx.TextCtrl(pnl, wx.ID_STATIC, "", size=(160, 22), style=wx.TE_PASSWORD)
-        if Config.STORE_PASS:
-            self.store_pw.SetValue(Config.STORE_PASS)
+        if default_config.STORE_PASS:
+            self.store_pw.SetValue(default_config.STORE_PASS)
         hBoxCred.Add(self.store_pw, flag=wx.EXPAND | wx.ALL, border=10)
 
         vBox.Add(hBoxCred, flag=wx.ALL | wx.ALIGN_LEFT, border=10)
@@ -91,14 +91,14 @@ class ScanInitDialog(wx.Dialog):
 
         try:
             if uri := self.store_uri.GetValue():
-                Config.STORE_URL = uri
+                default_config.STORE_URL = uri
                 if uri.lower().startswith("http"):
                     if user := self.store_user.GetValue():
-                        Config.STORE_USER = user
+                        default_config.STORE_USER = user
                     else:
                         raise ValueError(f"Missing username for {uri}")
                     if pw := self.store_pw.GetValue():
-                        Config.STORE_PASS = pw
+                        default_config.STORE_PASS = pw
                     else:
                         raise ValueError(f"Missing password for {uri}")
             else:

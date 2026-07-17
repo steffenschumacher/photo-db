@@ -1,12 +1,14 @@
 from datetime import datetime
 from sqlite3 import Connection, connect
 
+from ..config import Config, default_config
 from ..photo import LocalPhoto
 from .store import _table as store_table
 
 
 class ScanDB:
-    def __init__(self, db_uri=":memory:"):
+    def __init__(self, db_uri=":memory:", config: Config = default_config):
+        self.config = config
         self.cnx: Connection = connect(db_uri or ":memory:")
         self.table = store_table.copy()
         self.table.update(
@@ -52,7 +54,7 @@ class ScanDB:
         cur = self.cnx.execute(qry, (uuid,))
         if r := next(cur, None):
             photo_args = {f: r[idx] for idx, f in enumerate(self.table.keys())}
-            return LocalPhoto(**photo_args)
+            return LocalPhoto(**photo_args, config=self.config)
 
     def lookup_hash(self, hash: str) -> str | None:
         cur = self.cnx.execute(f"{self.select} WHERE hash = ?;", (hash,))
@@ -91,7 +93,7 @@ class ScanDB:
         results = []
         for r in self.cnx.execute(qry, tuple(params)):
             photo_args = {f: r[idx] for idx, f in enumerate(self.table.keys())}
-            results.append(LocalPhoto(**photo_args))
+            results.append(LocalPhoto(**photo_args, config=self.config))
         return results
 
 

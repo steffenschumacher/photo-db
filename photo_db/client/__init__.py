@@ -1,3 +1,4 @@
+from ..config import Config, default_config
 from .abstract_client import AbstractPDBClient
 from .local_client import LocalPDBClient
 from .web_client import WebPDBClient
@@ -5,17 +6,15 @@ from .web_client import WebPDBClient
 __all__ = ["AbstractPDBClient", "LocalPDBClient", "WebPDBClient", "init_client"]
 
 
-def init_client(url: str = None) -> AbstractPDBClient:
+def init_client(url: str = None, config: Config = default_config) -> AbstractPDBClient:
     from os.path import exists
 
-    from ..config import Config
-
-    url = url or Config.STORE_URL
+    url = url or config.STORE_URL
 
     if url.lower().startswith("http"):
-        return WebPDBClient(url.lower())
+        return WebPDBClient(url.lower(), config=config)
     elif exists(url):
-        Config.STORE_URL = url
-        return LocalPDBClient()
+        config.STORE_URL = url
+        return LocalPDBClient(config)
     else:
         raise ValueError(f"Invalid store uri: {url}")

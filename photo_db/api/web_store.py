@@ -4,24 +4,23 @@ from flask import Flask, request, send_file
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.exceptions import NotFound
 
-from ..config import Config
+from ..config import Config, default_config
 from ..photo import Photo
-
-auth = HTTPBasicAuth()
-
-
-@auth.verify_password
-def authenticate(username, password):
-    if username and password:
-        return username == Config.STORE_USER and password == Config.STORE_PASS
-    return False
+from ..store.logic import LocalStore
 
 
-def add_routes(app: Flask):
-    from photo_db.store.logic import LocalStore
+def add_routes(app: Flask, config: Config = default_config):
+    store = LocalStore(config)
+    auth = HTTPBasicAuth()
+
+    @auth.verify_password
+    def authenticate(username, password):
+        if username and password:
+            return username == config.STORE_USER and password == config.STORE_PASS
+        return False
 
     print("Setting up app routes..")
-    print(Config.info())
+    print(config.info())
 
     @app.route("/pre_check", methods=["POST"])
     @auth.login_required
@@ -29,20 +28,20 @@ def add_routes(app: Flask):
         jsn = request.json
         if isinstance(jsn, str):
             jsn = loads(jsn)
-        ph = Photo(**jsn)
-        LocalStore.check_hash(ph)
+        ph = Photo(**jsn, config=config)
+        store.check_hash(ph)
         return "OK"
 
     @app.route("/upload", methods=["POST"])
     @auth.login_required
     def upload():
-        return LocalStore.upload(request.data)
+        return store.upload(request.data)
 
     @app.route("/image/<uuid>", methods=["GET"])
     @auth.login_required
     def fetch_image(uuid: str) -> bytes:
-        if ph := LocalStore.get_photo(uuid):
-            data = LocalStore.read_photo(ph)
+        if ph := store.get_photo(uuid):
+            data = store.read_photo(ph)
 
             return send_file(
                 data,
@@ -55,7 +54,7 @@ def add_routes(app: Flask):
     @app.route("/meta/<uuid>", methods=["GET"])
     @auth.login_required
     def meta_image(uuid: str):
-        if ph := LocalStore.get_photo(uuid):
+        if ph := store.get_photo(uuid):
             data = ph.model_dump()
             if ph.date:
                 data["date"] = ph.date.timestamp()
@@ -67,4 +66,4 @@ def add_routes(app: Flask):
     @app.route("/hashes", methods=["GET"])
     @auth.login_required
     def hashes() -> dict[str, str]:
-        return LocalStore.get_hashes()
+        return store.get_hashes()

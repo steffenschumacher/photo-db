@@ -5,12 +5,13 @@ from os.path import join
 from pathlib import Path
 from unittest import mock
 
+from flask import Flask
 from pytest import fixture
 
-from photo_db.app import create_app
+from photo_db.api.web_store import add_routes
 from photo_db.client import LocalPDBClient, WebPDBClient
 from photo_db.config import Config
-from photo_db.db import store as store_db
+from photo_db.db.store import StoreDB
 
 # Fixture images live alongside this file, not relative to the process's
 # current working directory - resolve absolutely so tests pass regardless of
@@ -33,18 +34,22 @@ class RequestsClient:
 
 
 @fixture(scope="session")
-def app():
+def test_config() -> Config:
+    """A Config instance isolated to a fresh temp directory for the test session."""
     temp_dir = tempfile.mkdtemp()
-    Config.STORE_URL = temp_dir
-    Config.STORE_DB_URL = join(temp_dir, ".photo.db")
+    return Config(store_url=temp_dir)
 
-    app = create_app()
-    app.config.update(
+
+@fixture(scope="session")
+def app(test_config):
+    flask_app = Flask(__name__)
+    add_routes(flask_app, test_config)
+    flask_app.config.update(
         {
             "TESTING": True,
         }
     )
-    yield app
+    yield flask_app
 
 
 @fixture(scope="session")
@@ -56,12 +61,8 @@ def web_client(app):
 
 
 @fixture(scope="session")
-def local_store_client():
-    temp_dir = tempfile.mkdtemp()
-    Config.STORE_URL = temp_dir
-    Config.STORE_DB_URL = join(temp_dir, ".photo.db")
-    store_db.init_store_db()
-    yield LocalPDBClient()
+def local_store_client(test_config):
+    yield LocalPDBClient(test_config)
 
 
 @fixture()
@@ -81,10 +82,10 @@ def raw_photo() -> str:
 
 
 @fixture()
-def clean_store():
-    shutil.rmtree(Config.STORE_URL)
-    makedirs(Config.STORE_URL)
-    store_db.init_store_db()
+def clean_store(test_config):
+    shutil.rmtree(test_config.STORE_URL)
+    makedirs(test_config.STORE_URL)
+    StoreDB(test_config)
 
 
 def nearly_equals(a: float, b: float, tolerance: float = 0.001) -> bool:

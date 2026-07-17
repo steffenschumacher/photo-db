@@ -3,7 +3,7 @@ from io import BytesIO
 from requests import Response, get, post
 
 from ..api import DuplicateException, SimilarException
-from ..config import Config
+from ..config import Config, default_config
 from ..photo import Photo
 from .abstract_client import AbstractPDBClient
 
@@ -19,13 +19,14 @@ class WebClient:
 
 
 class WebPDBClient(AbstractPDBClient):
-    def __init__(self, url=None, user=None, pwd=None):
-        self.url = url or Config.STORE_URL
+    def __init__(self, url=None, user=None, pwd=None, config: Config = default_config):
+        self.config = config
+        self.url = url or config.STORE_URL
         self.http_kwargs = {
-            "auth": (user or Config.STORE_USER, pwd or Config.STORE_PASS),
-            "verify": Config.SSL_VERIFY,
+            "auth": (user or config.STORE_USER, pwd or config.STORE_PASS),
+            "verify": config.SSL_VERIFY,
         }
-        if not Config.SSL_VERIFY:
+        if not config.SSL_VERIFY:
             import urllib3
 
             urllib3.disable_warnings()
@@ -58,7 +59,7 @@ class WebPDBClient(AbstractPDBClient):
         r = self.client.get(url, **self.http_kwargs)
         self.process_response(r)
         kwargs = r.json() if callable(r.json) else r.json
-        return Photo(**kwargs)
+        return Photo(**kwargs, config=self.config)
 
     def hashes(self) -> dict[str, str]:
         url = f"{self.url}/hashes"
