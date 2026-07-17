@@ -73,7 +73,6 @@ def test_scan(local_store_client, clean_store, test_config):
     # uploaded alongside the original rather than replacing it - flagged as
     # a follow-up, not fixed in this pass to avoid changing scan behavior
     # beyond what was requested.
-    from importlib.util import find_spec
     from shutil import which
 
     raw_available = (
