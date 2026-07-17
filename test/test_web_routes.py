@@ -8,6 +8,8 @@ file-like/IO[bytes] object - this crashed with
 not just in obscure cases.
 """
 
+from hashlib import sha256
+
 from .conftest import STATIC_DIR
 
 
@@ -24,6 +26,20 @@ def test_fetch_image_round_trips_bytes(web_client, clean_store):
     with open(STATIC_DIR / "08-190641-4631.jpeg", "rb") as f:
         original = f.read()
     assert fetched == original
+
+
+def test_thumbnail_uses_compact_stable_etag(app, web_client, clean_store, test_config):
+    uuid = _upload_sample(web_client)
+    photo_hash = web_client.get_meta(uuid).hash
+
+    response = app.test_client().get(
+        f"/thumb/{uuid}", auth=(test_config.STORE_USER, test_config.STORE_PASS)
+    )
+
+    assert response.status_code == 200
+    assert response.content_type == "image/jpeg"
+    assert response.get_etag() == (sha256(photo_hash.encode()).hexdigest(), False)
+    assert len(response.headers["ETag"]) < 100
 
 
 def test_get_meta_returns_matching_photo(web_client, clean_store):

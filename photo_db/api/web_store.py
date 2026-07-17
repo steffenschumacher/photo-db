@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from hashlib import sha256
 from json import loads
 
 from flask import Flask, Response, request
@@ -72,9 +73,12 @@ def add_routes(app: Flask, config: Config = default_config):
             data = store.get_thumbnail(ph)
             response = Response(data, mimetype="image/jpeg")
             response.headers["Content-Disposition"] = f'inline; filename="{uuid}_thumb.jpg"'
-            # The perceptual hash never changes for a given photo, so it
-            # makes a stable, cheap-to-compare ETag for client-side caching.
-            response.set_etag(ph.hash)
+            # Keep the ETag compact. The base64 perceptual hash is ~6.5 KiB
+            # at the default 70x70 hash size; putting it directly in a
+            # response header exceeds Nginx's default uWSGI header buffer
+            # and turns an otherwise-successful upstream response into a
+            # 502. Its digest remains stable while fitting comfortably.
+            response.set_etag(sha256(ph.hash.encode()).hexdigest())
             return response
         raise NotFound(f"No image with uuid: {uuid}")
 
