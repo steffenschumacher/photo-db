@@ -1,8 +1,7 @@
 from datetime import UTC, datetime
-from io import BytesIO
 from json import loads
 
-from flask import Flask, Response, request, send_file
+from flask import Flask, Response, request
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.exceptions import NotFound
 
@@ -53,13 +52,17 @@ def add_routes(app: Flask, config: Config = default_config):
     def fetch_image(uuid: str) -> bytes:
         if ph := store.get_photo(uuid):
             data, ext = store.get_display_bytes(ph)
-
-            return send_file(
-                BytesIO(data),
-                download_name=ph.filename(),
-                mimetype=f"image/{ext.lower()}",
-                as_attachment=False,
-            )
+            # A plain Response with the bytes already in memory, rather than
+            # send_file(BytesIO(...)), deliberately avoids Werkzeug's
+            # wsgi.file_wrapper path: some WSGI servers (uWSGI in particular)
+            # provide a file_wrapper that tries to os.sendfile() the
+            # response, which doesn't work for an in-memory BytesIO (no real
+            # fd) and manifests as "broken pipe"/SIGPIPE errors server-side
+            # even though the data is perfectly fine - every request fails
+            # that way, not just slow/large ones.
+            response = Response(data, mimetype=f"image/{ext.lower()}")
+            response.headers["Content-Disposition"] = f'inline; filename="{ph.filename()}"'
+            return response
         raise NotFound(f"No image with uuid: {uuid}")
 
     @app.route("/thumb/<uuid>", methods=["GET"])
@@ -67,12 +70,8 @@ def add_routes(app: Flask, config: Config = default_config):
     def fetch_thumbnail(uuid: str) -> bytes:
         if ph := store.get_photo(uuid):
             data = store.get_thumbnail(ph)
-            response = send_file(
-                BytesIO(data),
-                download_name=f"{uuid}_thumb.jpg",
-                mimetype="image/jpeg",
-                as_attachment=False,
-            )
+            response = Response(data, mimetype="image/jpeg")
+            response.headers["Content-Disposition"] = f'inline; filename="{uuid}_thumb.jpg"'
             # The perceptual hash never changes for a given photo, so it
             # makes a stable, cheap-to-compare ETag for client-side caching.
             response.set_etag(ph.hash)
