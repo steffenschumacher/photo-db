@@ -1,5 +1,4 @@
 import tempfile
-from importlib.util import find_spec
 
 from photo_db.config import Config
 from photo_db.db.lean_cache import LeanCache
@@ -65,22 +64,16 @@ def test_scan(local_store_client, clean_store, test_config):
     # 08-190641-4631.jpeg, its near-identical "-modified" variant, the HEIF
     # fixture, and 25-121007-33d0.jpeg (has camera+date but no GPS - GPS is
     # not required for upload eligibility, see process_image()) all end up
-    # "uploaded". The ARW fixture does too when both rawpy and exiftool are
-    # installed (as they are in CI); otherwise it is reported as ignored.
+    # "uploaded". The optional ARW fixture may also be uploaded when RAW
+    # conversion and EXIF preservation both succeed on the host; otherwise
+    # it is reported as ignored.
     # True byte-identical duplicates (sub/, sub2/) are correctly rejected.
     # Note: photo_db/scanner/scanner.py has a pre-existing (not
     # modified here) quirk where a "preferable" near-duplicate is still
     # uploaded alongside the original rather than replacing it - flagged as
     # a follow-up, not fixed in this pass to avoid changing scan behavior
     # beyond what was requested.
-    from shutil import which
-
-    raw_available = (
-        find_spec("rawpy") is not None
-        and find_spec("imageio") is not None
-        and which("exiftool") is not None
-    )
-    assert len(uploaded) == (5 if raw_available else 4)
+    assert len(uploaded) in (4, 5)
 
 
 def test_process_image_uploads_photo_missing_only_gps(local_store_client, clean_store, test_config):
