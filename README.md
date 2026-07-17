@@ -39,7 +39,11 @@ pre-commit hooks + CI. See:
 ## Desktop UI (thick client)
 
 `photo_db/ui/` is a PySide6 (Qt) desktop app for maintaining a photo library
-both locally and against a remote web backend:
+both locally and against a remote web backend. **Scan folder..**, **Sync
+library..**, and **Settings..** are available both from the menu bar *and*
+a toolbar (menus alone are easy to miss on macOS, where they live in the
+global system menu rather than in the window), and the status bar always
+shows which store is currently active (`Store (local|remote): <path/url>`):
 
 - **Scan folder..** recursively scans a chosen directory and adopts any
   photos not already present in the configured store (local path or remote
@@ -57,6 +61,11 @@ both locally and against a remote web backend:
   view, with a small on-disk client-side cache.
 - **Settings..** edits `Config` (store URL/credentials, hash size,
   similarity threshold, lean cache path) and persists changes to `.env`.
+  Saving takes effect immediately — the store (local or remote), lean
+  cache, and thumbnail grid are all reloaded in place, no restart needed.
+  A brand new local folder path is a valid choice (created on demand); if
+  no valid store is configured yet, the window shows a placeholder with a
+  direct link back to Settings instead of a dead end.
 
 Requires the `ui` extra (`uv sync --extra ui`); launch with:
 

@@ -7,14 +7,14 @@ __all__ = ["AbstractPDBClient", "LocalPDBClient", "WebPDBClient", "init_client"]
 
 
 def init_client(url: str = None, config: Config = default_config) -> AbstractPDBClient:
-    from os.path import exists
-
     url = url or config.STORE_URL
+    if not url:
+        raise ValueError("No store configured - set a local folder path or http(s):// URL")
 
     if url.lower().startswith("http"):
-        return WebPDBClient(url.lower(), config=config)
-    elif exists(url):
-        config.STORE_URL = url
-        return LocalPDBClient(config)
-    else:
-        raise ValueError(f"Invalid store uri: {url}")
+        return WebPDBClient(url, config=config)
+    # Any non-http(s) value is treated as a local folder path. LocalStore
+    # creates the folder itself if it doesn't exist yet, so a brand new,
+    # not-yet-existing path is a valid (first-run) choice, not an error.
+    config.STORE_URL = url
+    return LocalPDBClient(config)
