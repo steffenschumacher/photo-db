@@ -83,6 +83,13 @@ jobs:
 
       - name: Build and push
         uses: docker/build-push-action@v6
+        # DOCKER_BUILD_SUMMARY=false: skip auto-uploading the buildx build
+        # record ("<repo>~<random>.dockerbuild") artifact that backs the
+        # Actions build summary - it isn't consumed by anything downstream
+        # in this workflow, and its download proved flaky in the
+        # github-release job (see that job's comment).
+        env:
+          DOCKER_BUILD_SUMMARY: false
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -156,10 +163,17 @@ jobs:
     needs: [docker, windows-build, macos-build]
     runs-on: ubuntu-latest
     steps:
-      - name: Download all artifacts
+      - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          # docker/build-push-action@v6 also auto-uploads a
+          # "<repo>~<random>.dockerbuild" build-record artifact (backing its
+          # Actions build summary) alongside the two we actually create -
+          # its download proved flaky ("Artifact download failed after 5
+          # retries") and we don't need it for the release anyway, so only
+          # fetch the artifacts this workflow explicitly produced.
+          pattern: photodb-ui-*
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
