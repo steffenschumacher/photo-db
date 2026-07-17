@@ -1,4 +1,5 @@
 import tempfile
+from importlib.util import find_spec
 
 from photo_db.config import Config
 from photo_db.db.lean_cache import LeanCache
@@ -75,7 +76,11 @@ def test_scan(local_store_client, clean_store, test_config):
     from importlib.util import find_spec
     from shutil import which
 
-    raw_available = find_spec("rawpy") is not None and which("exiftool") is not None
+    raw_available = (
+        find_spec("rawpy") is not None
+        and find_spec("imageio") is not None
+        and which("exiftool") is not None
+    )
     assert len(uploaded) == (5 if raw_available else 4)
 
 
