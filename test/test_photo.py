@@ -48,3 +48,25 @@ def test_convert_raw(raw_photo):
     update_exif(ph.local_path, gps=coords)
     updated_ph = LocalPhoto.from_file(ph.local_path)
     assert updated_ph.longitude is not None
+
+
+def test_convert_raw_without_exiftool_binary_raises_valueerror_not_filenotfounderror(
+    raw_photo, monkeypatch
+):
+    """Regression test: convert_raw() used to shell out to exiftool
+    unconditionally (subprocess.Popen(["exiftool", ...])), so on any machine
+    without that system binary installed (e.g. a plain CI runner) it raised
+    an uncaught FileNotFoundError - which Scanner.process_image's except
+    clause doesn't catch (only ValueError/ImportError/ModuleNotFoundError),
+    crashing the entire scan batch (see test_scanner.py::test_scan and
+    Scanner.uploading_complete). Without exiftool the converted photo
+    genuinely has no EXIF date to parse, so LocalPhoto.from_file() still
+    raises - but now a ValueError, the same already-handled "reject this one
+    photo, keep scanning" category as any other incomplete-EXIF photo,
+    instead of an unhandled FileNotFoundError."""
+    pytest.importorskip("rawpy", reason="rawpy (RAW conversion) is an optional dependency")
+    import photo_db.photo.arw_converter as arw_converter
+
+    monkeypatch.setattr(arw_converter.shutil, "which", lambda _: None)
+    with pytest.raises(ValueError):
+        arw_converter.convert_raw(raw_photo)

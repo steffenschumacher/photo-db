@@ -34,6 +34,9 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
 
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
+
       - name: Install dependencies
         run: uv sync --extra api --extra raw --dev
 

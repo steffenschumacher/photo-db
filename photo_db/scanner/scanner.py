@@ -68,7 +68,15 @@ class Scanner:
     def scan_dir(self, path: str):
         if self.start is None:
             self.start = time()
-        for file in listdir(path):
+        # Sorted rather than raw listdir() order: directory entry order is
+        # filesystem/OS-dependent (unordered on ext4, often insertion-order
+        # on APFS) and this scanner's near-duplicate resolution is
+        # order-sensitive (see check_with_processed_photos - whichever
+        # "similar" photo is registered first wins unless a later one is
+        # strictly preferable). Sorting makes scan outcomes reproducible
+        # across machines/filesystems instead of depending on incidental
+        # directory ordering.
+        for file in sorted(listdir(path)):
             full = join(path, file)
             if isdir(full):
                 self.scan_dir(full)
@@ -108,9 +116,16 @@ class Scanner:
                 self.futures.insert(0, fut)
                 return False, photos
             except Exception as e:
+                # A single unexpected failure (e.g. a corrupt file, or a
+                # missing optional system binary like exiftool) must not
+                # abort processing of the rest of the batch - especially
+                # since blocking=True callers expect this method to fully
+                # drain self.futures in one call. Log it, count it as
+                # processed (so self.processed/self.detected bookkeeping
+                # stays consistent), and move on to the next future.
                 print(f"Received unhandled exception: {e}")
                 print_exc()
-                return False, photos
+                self.processed += 1
 
     def process_image(self, path: str, file: str, pre_check_hash=True):
         full = join(path, file)

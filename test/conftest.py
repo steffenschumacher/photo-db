@@ -36,10 +36,28 @@ class RequestsClient:
 
 @fixture(scope="session")
 def test_config() -> Config:
-    """A Config instance isolated to a fresh temp directory for the test session."""
+    """A Config instance isolated to a fresh temp directory for the test session.
+
+    store_user/store_pass are pinned to fixed test values rather than left to
+    fall back to the ambient PH_STORE_USER/PH_STORE_PASS environment
+    variables (loaded from a developer's local .env via load_dotenv()).
+    Without this, tests only "happen" to pass on a machine that has a real
+    .env with matching credentials - the web_client fixture (server) and any
+    WebPDBClient built from default_config (client) would independently read
+    the same env vars and coincidentally agree. In CI (no .env at all) both
+    sides fall back to None, but HTTPBasicAuth still sends stringified
+    credentials, so authenticate() never matches and every authenticated
+    request 401s - this pins deterministic, environment-independent
+    credentials for both sides of the test fixtures.
+    """
     temp_dir = tempfile.mkdtemp()
     lean_cache_dir = tempfile.mkdtemp()
-    return Config(store_url=temp_dir, lean_cache_path=join(lean_cache_dir, "lean_cache.db"))
+    return Config(
+        store_url=temp_dir,
+        lean_cache_path=join(lean_cache_dir, "lean_cache.db"),
+        store_user="testuser",  # pragma: allowlist secret
+        store_pass="testpass",  # pragma: allowlist secret
+    )
 
 
 @fixture(scope="session")
@@ -55,11 +73,17 @@ def app(test_config):
 
 
 @fixture(scope="session")
-def web_client(app):
+def web_client(app, test_config):
     tgt = "photo_db.client.web_client.WebPDBClient.client"
 
     with mock.patch(tgt, RequestsClient(app.test_client())):
-        yield WebPDBClient("http://127.0.0.1:5000")
+        # Pass test_config explicitly so the client's Basic Auth credentials
+        # match the server's (add_routes(app, test_config) above) rather than
+        # falling back to WebPDBClient's default_config, which reads
+        # PH_STORE_USER/PH_STORE_PASS straight from the environment - fine
+        # locally if a developer's .env happens to match, but always None
+        # (and thus always a 401) in CI, where no .env exists.
+        yield WebPDBClient("http://127.0.0.1:5000", config=test_config)
 
 
 @fixture(scope="session")

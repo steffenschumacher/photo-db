@@ -98,3 +98,50 @@ def test_scan_from_a_different_thread_than_construction(
 
     assert not errors, f"scan driven from a worker thread raised: {errors}"
     assert sc.processed == sc.detected
+
+
+def test_uploading_complete_skips_a_failed_future_instead_of_aborting_the_batch(
+    local_store_client, clean_store, test_config
+):
+    """Regression test: uploading_complete() used to treat any unexpected
+    exception raised while resolving a future as fatal to the whole drain
+    loop (`return False, photos` without processing the remaining futures),
+    even when called with blocking=True (which callers reasonably expect to
+    fully drain self.futures in one call). One bad file (e.g. a RAW photo
+    hitting a missing exiftool binary) would silently strand the rest of an
+    otherwise-healthy batch. Now a single failed future is logged and
+    skipped, and the remaining futures are still processed."""
+    sc = Scanner(local_store_client, config=test_config, lean_cache=_fresh_lean_cache())
+
+    def _boom():
+        raise RuntimeError("simulated unexpected processing failure")
+
+    def _ok():
+        from datetime import datetime
+        from uuid import uuid4
+
+        from photo_db.photo.photo import LocalPhoto
+
+        return LocalPhoto(
+            path="/tmp/does-not-matter.jpeg",
+            camera="Unknown",
+            date=datetime.now(),
+            width=1,
+            height=1,
+            hash=str(uuid4()),
+            extension="jpeg",
+            status="ignored",
+        )
+
+    sc.futures.appendleft(sc.pool.submit(_boom))
+    sc.futures.appendleft(sc.pool.submit(_ok))
+    sc.futures.appendleft(sc.pool.submit(_ok))
+    sc.detected = 3
+
+    done, photos = sc.uploading_complete(blocking=True)
+
+    assert done
+    # Both non-failing futures must still be drained (and upserted) despite
+    # the failed one sitting among them - not stranded behind it.
+    assert len(photos) == 2
+    assert sc.processed == 3

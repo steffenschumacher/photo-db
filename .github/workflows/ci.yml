@@ -20,6 +20,14 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
 
+      - name: Install system dependencies
+        # exiftool is a system binary (not pip-installable) that
+        # convert_raw() shells out to for copying EXIF tags (camera/GPS/
+        # date) from a RAW original onto the JPEG rawpy produces - installed
+        # here so the "raw" extra's code path is actually exercised in CI,
+        # matching what a real deployment doing RAW conversion needs.
+        run: sudo apt-get update && sudo apt-get install -y libimage-exiftool-perl
+
       - name: Install dependencies
         run: uv sync --extra api --extra raw --dev
 
