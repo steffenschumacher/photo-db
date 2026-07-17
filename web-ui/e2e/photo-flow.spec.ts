@@ -9,7 +9,7 @@ async function fixture(name: string, type: string) {
   return { name, type, base64: (await readFile(resolve(staticDir, name))).toString('base64') };
 }
 
-test('classifies real JPEG/HEIF fixtures locally and uploads only a preferable new file', async ({
+test('classifies real JPEG/HEIF fixtures locally and uploads eligible new files', async ({
   page,
   request,
 }) => {
@@ -73,19 +73,20 @@ test('classifies real JPEG/HEIF fixtures locally and uploads only a preferable n
   const row = (name: string) => page.locator('.scan-row').filter({ hasText: name });
   await expect(row(jpeg.name)).toContainText('duplicate');
   await expect(row(heif.name)).toContainText('new');
-  await expect(row(incomplete.name)).toContainText('incomplete');
+  await expect(row(incomplete.name)).toContainText('new');
   await expect(row('camera.ARW')).toContainText('desktop');
   await expect(row(modified.name)).toContainText('duplicate');
   await expect(row(jpeg.name).getByRole('button', { name: 'View existing photo' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Upload 1 new' }).click();
+  await page.getByRole('button', { name: 'Upload 2 new' }).click();
   await expect(row(heif.name)).toContainText('uploaded');
+  await expect(row(incomplete.name)).toContainText('uploaded');
 
   const sync = await request.get('http://127.0.0.1:5000/sync?limit=100', {
     headers: { Authorization: `Basic ${credentials}` },
   });
   expect(sync.ok()).toBeTruthy();
-  expect((await sync.json()).photos).toHaveLength(2);
+  expect((await sync.json()).photos).toHaveLength(3);
 
   // The server hashes the uploaded HEIF with Pillow. A second browser scan
   // proves the canvas/HEIC hash still falls within the Python similarity limit.

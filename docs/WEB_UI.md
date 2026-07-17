@@ -8,7 +8,7 @@ session. No metadata is retained in IndexedDB or any other browser database;
 each refresh and each folder scan starts a new paginated sync from the backend.
 
 Chrome and Edge additionally expose **Scan a folder**. The browser walks the
-chosen directory locally, rejects RAW/unsupported files, checks camera/date/GPS
+chosen directory locally, rejects RAW/unsupported files, checks camera/date
 EXIF before image decoding, and calculates the Python-compatible 70×70 average
 hash at all four rotations. Candidate hashes are compared with the in-memory
 library and earlier files in the same scan. Only selected, unmatched files are
@@ -32,8 +32,9 @@ npm run e2e
 After uploading `test/static/08-190641-4631.jpeg` and
 `test/static/0A4E249E-E8B1-4BA8-8FBD-6D778B3DE99E.heif` through the desktop or
 API client, sync the browser library and scan `test/static/`. Both originals
-and their copies should report **duplicate**; `25-121007-33d0.jpeg` should
-report **incomplete**; and `15175111__DSC04832.ARW` should report **desktop**.
+and their copies should report **duplicate**; `25-121007-33d0.jpeg` has no GPS
+but remains eligible (GPS is optional); and `15175111__DSC04832.ARW` should
+report **desktop**.
 Rotate a JPEG physically (not only via EXIF) and rescan it to validate the
 rotation variants.
 

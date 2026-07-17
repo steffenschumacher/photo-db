@@ -90,20 +90,11 @@ export class ScannerService {
     if (!/\.(jpe?g|heic|heif)$/i.test(file.name))
       return { ...result, status: 'desktop', detail: 'Unsupported image format' };
 
-    const metadata = await exifr.parse(file, [
-      'Make',
-      'Model',
-      'DateTimeOriginal',
-      'CreateDate',
-      'latitude',
-      'longitude',
-    ]);
-    const gps = await exifr.gps(file);
+    const metadata = await exifr.parse(file, ['Make', 'Model', 'DateTimeOriginal', 'CreateDate']);
     const captured = metadata?.DateTimeOriginal ?? metadata?.CreateDate;
     const missing: string[] = [];
     if (!metadata?.Model) missing.push('camera');
     if (!captured) missing.push('date');
-    if (gps?.latitude == null || gps?.longitude == null) missing.push('GPS');
     if (missing.length)
       return {
         ...result,

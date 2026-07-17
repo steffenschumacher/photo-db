@@ -136,34 +136,24 @@ class Scanner:
                 ph = convert_raw(full, self.config)
             else:
                 ph = LocalPhoto.from_file(full, config=self.config)
-            missing = []
-            if not ph.camera or ph.camera == "unknown camera":
-                missing.append("camera")
-            if ph.latitude is None or ph.longitude is None:
-                missing.append("GPS")
-            if not ph.date:
-                missing.append("date")
-            if missing:
-                ph.latitude = ph.latitude or 0
-                ph.longitude = ph.longitude or 0
-                ph.altitude = ph.altitude or 0
-                ph.camera = ph.camera or "N/A"
-                ph.date = ph.date or datetime.fromtimestamp(0.0)
-                ph.reject_reason = f"Incomplete EXIF data ({'+'.join(missing)})"
-                ph.status = "exif"
-                return ph
+            # GPS is deliberately not required for upload eligibility:
+            # plenty of legitimate photos (older/non-phone cameras, GPS
+            # disabled, etc.) simply never had location data to begin
+            # with - rejecting those wholesale would silently exclude a
+            # lot of otherwise-valid library content. Camera and capture
+            # date don't need an equivalent check here: both are
+            # non-optional fields on Photo, so LocalPhoto.from_file()/
+            # convert_raw() already raise ValueError (handled below,
+            # status "ignored") rather than ever producing a Photo with
+            # either one missing.
+            ph.latitude = ph.latitude or 0
+            ph.longitude = ph.longitude or 0
+            ph.altitude = ph.altitude or 0
         except (ValueError, ImportError, ModuleNotFoundError) as ve:
             print(f"{file} is not a valid photo - skipping: {ve}")
             reason = ve.args[0].split(": ")[-1] if ve.args else str(ve)
-            missing = []
-            if "Unable to parse datetime" in str(ve):
-                missing.append("date")
-            if "Unable to parse GPS" in str(ve):
-                missing.append("GPS")
             if isinstance(ve, ImportError | ModuleNotFoundError):
                 reason = f"RAW conversion unavailable ({reason}) - install the 'raw' extra"
-            if missing:
-                reason = f"Incomplete EXIF data ({'+'.join(missing)})"
             dummy_args = {
                 "path": full,
                 "camera": "Unknown",
@@ -173,7 +163,7 @@ class Scanner:
                 "hash": str(uuid4()),
                 "extension": full.split(sep)[-1],
                 "reject_reason": reason,
-                "status": "exif" if missing else "ignored",
+                "status": "ignored",
             }
             return LocalPhoto(**dummy_args)
         if self.check_with_processed_photos(ph):

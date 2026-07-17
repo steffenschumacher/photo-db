@@ -61,27 +61,52 @@ def test_scan(local_store_client, clean_store, test_config):
     assert sc.detected > 0
     assert len(processed) == sc.detected
     uploaded = [p for p in sc.scan_hashes.values() if p.status == "uploaded"]
-    # 08-190641-4631.jpeg, its near-identical "-modified" variant, and the
-    # HEIF fixture all end up "uploaded": true byte-identical duplicates
-    # (sub/, sub2/) are correctly rejected, and photos missing GPS/EXIF data
-    # are rejected too. Note: photo_db/scanner/scanner.py has a pre-existing
-    # (not modified here) quirk where a "preferable" near-duplicate is still
+    # 08-190641-4631.jpeg, its near-identical "-modified" variant, the HEIF
+    # fixture, and 25-121007-33d0.jpeg (has camera+date but no GPS - GPS is
+    # not required for upload eligibility, see process_image()) all end up
+    # "uploaded". The ARW fixture does too when both rawpy and exiftool are
+    # installed (as they are in CI); otherwise it is reported as ignored.
+    # True byte-identical duplicates (sub/, sub2/) are correctly rejected.
+    # Note: photo_db/scanner/scanner.py has a pre-existing (not
+    # modified here) quirk where a "preferable" near-duplicate is still
     # uploaded alongside the original rather than replacing it - flagged as
     # a follow-up, not fixed in this pass to avoid changing scan behavior
     # beyond what was requested.
-    assert len(uploaded) == 3
+    from importlib.util import find_spec
+    from shutil import which
+
+    raw_available = find_spec("rawpy") is not None and which("exiftool") is not None
+    assert len(uploaded) == (5 if raw_available else 4)
 
 
-def test_incomplete_exif_reports_the_actual_missing_fields(
-    local_store_client, clean_store, test_config, exif_incomplete_photo
-):
+def test_process_image_uploads_photo_missing_only_gps(local_store_client, clean_store, test_config):
+    """25-121007-33d0.jpeg has valid camera+date EXIF but no GPS - GPS is
+    deliberately optional (see process_image()), so it should upload
+    normally rather than being rejected as "incomplete EXIF"."""
     sc = Scanner(local_store_client, config=test_config, lean_cache=_fresh_lean_cache())
-    path, filename = exif_incomplete_photo.rsplit("/", 1)
+    ph = sc.process_image(str(STATIC_DIR), "25-121007-33d0.jpeg")
+    assert ph.status == "uploaded"
+    assert ph.reject_reason is None
 
-    photo = sc.process_image(path, filename)
 
-    assert photo.status == "exif"
-    assert photo.reject_reason == "Incomplete EXIF data (GPS)"
+def test_process_image_ignores_photo_missing_camera_and_date(
+    local_store_client, clean_store, test_config, tmp_path
+):
+    """Camera and capture date are non-optional fields on Photo (unlike
+    GPS), so a file with neither can never become a valid Photo in the
+    first place - LocalPhoto.from_file() raises ValueError, which
+    process_image() reports as status "ignored" rather than "exif" (that
+    status is now GPS-only-completeness territory, and GPS alone never
+    blocks upload)."""
+    from PIL import Image
+
+    bare = tmp_path / "no_exif.jpeg"
+    Image.new("RGB", (32, 32), color="red").save(bare, "JPEG")
+
+    sc = Scanner(local_store_client, config=test_config, lean_cache=_fresh_lean_cache())
+    ph = sc.process_image(str(tmp_path), "no_exif.jpeg")
+    assert ph.status == "ignored"
+    assert "Unable to parse datetime" in ph.reject_reason
 
 
 def test_scan_from_a_different_thread_than_construction(
