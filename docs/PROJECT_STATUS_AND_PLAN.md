@@ -139,6 +139,58 @@ workflow for near-duplicates (the pre-existing scanner quirk where a
 "preferable" near-duplicate is uploaded alongside rather than replacing the
 original — out of scope, left as-is), drag-and-drop import, and any kind of
 multi-select/batch actions (delete, tag) in the thumbnail grid.
+
+## 0b. Rotation support + rotation-invariant duplicate detection (later session addendum)
+
+Follow-up round, on explicit user request, covering four thumbnail-grid UX
+gaps plus a duplicate-detection correctness gap surfaced while implementing
+them:
+
+1. **EXIF auto-rotation for thumbnails and the full-image viewer**
+   (`photo_db/photo/orientation.py`, new): `render_oriented()` applies
+   `PIL.ImageOps.exif_transpose` (bakes in EXIF `Orientation`) followed by
+   an additional manual `Photo.rotation` correction (new field, clockwise
+   degrees: 0/90/180/270). `generate_thumbnail()` and
+   `LocalStore.get_display_bytes()`/`GET /image/<uuid>` all route through
+   it, so both thumbnails and the full-size viewer are always shown
+   right-way-up regardless of what the camera wrote to EXIF.
+2. **`ImageViewerDialog`** (`photo_db/ui/image_viewer.py`, new):
+   double-clicking a thumbnail opens the full (auto-oriented) image with
+   "Rotate left"/"Rotate right" buttons. Rotating calls
+   `AbstractPDBClient.rotate(uuid, delta)` — implemented identically for
+   local (`LocalStore.rotate()`, updates `rotation` in the DB + regenerates
+   the cached thumbnail) and remote (`POST /rotate/<uuid>`) stores, so the
+   dialog doesn't need to know which kind of store it's talking to. A
+   `rotated` signal tells the grid to invalidate its cached thumbnail for
+   that uuid so the change is visible immediately without a full re-sync.
+3. **Scan-dialog completion lockout**: `ScanDialog` now shows an
+   indeterminate `QProgressBar` while scanning and permanently disables
+   "Start scan"/folder-picker controls once a scan finishes successfully
+   (only "Close" stays clickable) — previously the button stayed enabled,
+   inviting a confusing double-scan. On failure the controls are
+   re-enabled instead (a failed scan is recoverable).
+4. **Rotation-invariant duplicate detection.** The existing hash-based
+   duplicate check (`imagehash.average_hash`, computed over a small
+   grayscale grid) is *not* rotation-invariant: a photo re-saved rotated by
+   some external tool (EXIF `Orientation` reset to "normal", pixels
+   physically rotated) hashes completely differently from the original and
+   was silently adopted as an unrelated new photo. Fix, in
+   `photo_db/photo/parsers.py`/`photo_db/photo/photo.py`:
+   `rotation_hash_variants()` computes the hash at all four rotations
+   (0/90/180/270) from a *single* decode+resize+mean pass — rotating the
+   already-tiny hash grid via `numpy.rot90` is effectively free next to the
+   dominant image-decode cost, so this isn't a meaningful performance
+   concern. `LocalStore.check_hash()` checks a candidate against all four
+   of its own rotation variants; a match found only via a rotated variant
+   is always treated as a duplicate (bypassing the `preferable_to()`
+   date/resolution heuristic, which can never distinguish an original from
+   its own rotated resave — same date, same total pixel area) and the
+   *existing* stored photo's `rotation` field is auto-corrected to match
+   (unless it was already manually corrected via feature 2 above, which is
+   never overwritten). This reuses the `rotation` field/plumbing from
+   feature 1-2 rather than adding a new alias/audit schema, per explicit
+   user decision after discussing the alternative.
+
 | `photo_db/cli/__init__.py` | **Dead code** | References `read_config`/`load_config` that don't exist anywhere in the codebase — this module cannot run. Looks like an abandoned earlier CLI design, superseded by `pdbscanner.py`. |
 | Tests | **~20% effectively passing** | See §3 — tests exist and mostly *can* pass, but only if run from inside `test/` (no `pytest.ini`/`pyproject.toml` sets `rootdir`/`testpaths`), and the two `ui/` tests open real, blocking OS GUI windows (`wx.App().MainLoop()`) rather than testing anything programmatically — they will hang indefinitely in CI or any non-interactive environment. |
 | Packaging / dependency management | **Legacy** | Two virtualenvs checked into the repo (`venv/`, `venv311/`), split `requirements*.txt` files that have already drifted from each other (see diff in §2.7), no `pyproject.toml`, no lockfile, no declared Python version. |

@@ -13,15 +13,21 @@ so that clearly-duplicate or clearly-inferior images never have to be uploaded.
    metadata that's already available (or trivially readable) to reject/accept
    candidates: EXIF capture date/time, camera model, GPS. Only if a photo looks
    "new" is the more expensive step taken.
-2. **Perceptual hash of a scaled-down image.** The client computes an
-   `average_hash` (via `imagehash`) over a resized version of the photo. This
-   hash is small, fast to compute, and — crucially — **deterministic between
-   client and server**, so the client can ask the server "have you already got
-   something whose hash is this, or close to it?" *before* uploading the full
-   image. This also lets the same algorithm catch near-duplicates such as
-   re-compressed, resized, or slightly-edited copies of a photo (perceptual
-   hashing tolerates small pixel differences, unlike a cryptographic hash of
-   the raw bytes).
+2. **Perceptual hash of a scaled-down image, rotation-invariant.** The client
+   computes an `average_hash` (via `imagehash`) over a resized version of the
+   photo. This hash is small, fast to compute, and — crucially —
+   **deterministic between client and server**, so the client can ask the
+   server "have you already got something whose hash is this, or close to
+   it?" *before* uploading the full image. This also lets the same algorithm
+   catch near-duplicates such as re-compressed, resized, or slightly-edited
+   copies of a photo (perceptual hashing tolerates small pixel differences,
+   unlike a cryptographic hash of the raw bytes). Because rotating the tiny
+   hash grid via `numpy.rot90` is effectively free (see
+   `Photo.hash_variants()` / `parsers.rotation_hash_variants()`), the hash is
+   also computed at all four 90-degree rotations, so a photo that's been
+   physically re-saved rotated (EXIF `Orientation` reset, pixels physically
+   turned) by some other tool is still recognized as the same photo, not
+   silently adopted as a new one.
 3. **Similarity, not just equality.** Two hashes are compared with a Hamming
    distance (`numpy` bit-count) against a configurable threshold
    (`Config.SIMILARITY` / `Config.diff_limit()`), so resized/re-encoded/slightly
@@ -33,7 +39,14 @@ so that clearly-duplicate or clearly-inferior images never have to be uploaded.
    This lets a later, better scan of the same photo replace a lower quality
    previously-imported copy — the intent being asserted in code, though see
    `docs/PROJECT_STATUS_AND_PLAN.md` for gaps in how consistently this is
-   enforced.
+   enforced. This heuristic is **not** used when the match came from a
+   rotated hash variant (see idea 2): a rotated resave typically has the
+   same capture date *and* the same total pixel count as the original (just
+   width/height swapped), so `preferable_to` could never fire for it — such
+   matches are always rejected as duplicates, and the existing photo's
+   `Photo.rotation` is instead auto-corrected to display right-way-up
+   (unless a user already manually corrected it via the image viewer, which
+   is never overwritten by this auto-correction).
 5. **Deterministic, chronological storage layout.** Once a photo is accepted,
    it is stored under `STORE_URL/<year>/<month>/<filename>`, where the
    filename is built from the capture date so that:
@@ -92,6 +105,15 @@ so that clearly-duplicate or clearly-inferior images never have to be uploaded.
     as git history) — PySide6 was chosen for its LGPL license and because
     `QAbstractListModel` + `QThreadPool` is the idiomatic Qt pattern for a
     virtualized, lazily-loaded grid.
+11. **Orientation-aware display and manual rotation.** Thumbnails and the
+    full-image viewer (`photo_db/photo/orientation.py`) both bake in EXIF
+    `Orientation` plus any manual `Photo.rotation` correction before
+    display, so a photo whose camera wrote a rotated `Orientation` tag (or
+    that was manually corrected via the UI) always renders right-way-up.
+    Double-clicking a thumbnail opens `ImageViewerDialog`
+    (`photo_db/ui/image_viewer.py`) with rotate-left/right buttons that call
+    `AbstractPDBClient.rotate(uuid, delta)` — implemented identically for
+    local (`LocalStore.rotate`) and remote (`POST /rotate/<uuid>`) stores.
 
 ## Component map
 

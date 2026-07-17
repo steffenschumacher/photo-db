@@ -17,6 +17,7 @@ _table = {
     "hash": "VARCHAR(250) not NULL",
     "extension": "VARCHAR(5) not NULL",
     "scanned": "int(4) not NULL",
+    "rotation": "int NOT NULL DEFAULT 0",
 }
 _select = f"SELECT {','.join(_table.keys())} FROM photo"
 
@@ -47,6 +48,13 @@ class StoreDB:
                 fields = ",".join([f"{f} {d}" for f, d in _table.items()])
                 c.execute(f"""CREATE TABLE IF NOT EXISTS photo ({fields});""")
                 c.execute("""CREATE INDEX index_hash ON photo(hash);""")
+                c.commit()
+            else:
+                # Migrate older stores created before a column existed.
+                existing = {row[1] for row in c.execute("PRAGMA table_info(photo);")}
+                for field, ddl in _table.items():
+                    if field not in existing:
+                        c.execute(f"ALTER TABLE photo ADD COLUMN {field} {ddl};")
                 c.commit()
         finally:
             if c:
@@ -97,6 +105,15 @@ class StoreDB:
         try:
             for r in c.execute(f"{_select} WHERE hash = ?;", (hash,)):
                 return r[0]  # uuid is first value
+        finally:
+            if c:
+                c.close()
+
+    def update_rotation(self, uuid: str, rotation: int) -> None:
+        c = self._cnx()
+        try:
+            c.execute("UPDATE photo SET rotation = ? WHERE uuid = ?;", (rotation, uuid))
+            c.commit()
         finally:
             if c:
                 c.close()

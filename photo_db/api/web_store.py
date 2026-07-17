@@ -52,12 +52,12 @@ def add_routes(app: Flask, config: Config = default_config):
     @auth.login_required
     def fetch_image(uuid: str) -> bytes:
         if ph := store.get_photo(uuid):
-            data = store.read_photo(ph)
+            data, ext = store.get_display_bytes(ph)
 
             return send_file(
                 BytesIO(data),
                 download_name=ph.filename(),
-                mimetype=f"image/{ph.extension.lower()}",
+                mimetype=f"image/{ext.lower()}",
                 as_attachment=False,
             )
         raise NotFound(f"No image with uuid: {uuid}")
@@ -89,6 +89,15 @@ def add_routes(app: Flask, config: Config = default_config):
             if ph.scanned:
                 data["scanned"] = ph.scanned.timestamp()
             return data
+        raise NotFound(f"No image with uuid: {uuid}")
+
+    @app.route("/rotate/<uuid>", methods=["POST"])
+    @auth.login_required
+    def rotate(uuid: str):
+        jsn = request.json or {}
+        delta = int(jsn.get("delta", 90))
+        if ph := store.rotate(uuid, delta):
+            return {"rotation": ph.rotation}
         raise NotFound(f"No image with uuid: {uuid}")
 
     @app.route("/hashes", methods=["GET"])

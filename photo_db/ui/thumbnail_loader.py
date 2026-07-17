@@ -11,7 +11,7 @@ thread (in the ``ready`` slot) - constructing pixmaps off the GUI thread is
 not safe on all platforms, so worker tasks only ever emit raw bytes.
 """
 
-from os import makedirs
+from os import makedirs, remove
 from os.path import dirname, exists, join
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
@@ -93,3 +93,14 @@ class ThumbnailLoader(QObject):
     def _on_failed(self, uuid: str, message: str) -> None:
         self._pending.discard(uuid)
         print(f"Thumbnail fetch failed for {uuid}: {message}")
+
+    def invalidate(self, uuid: str) -> None:
+        """Drop any cached copy of ``uuid``'s thumbnail (in-memory icon and
+        on-disk cache file), forcing the next :meth:`request` to re-fetch.
+        Needed after a rotation change, since the uuid-keyed cache file
+        would otherwise keep serving the stale orientation."""
+        self._memory.pop(uuid, None)
+        self._pending.discard(uuid)
+        cache_path = join(self.cache_dir, f"{uuid}.jpg")
+        if exists(cache_path):
+            remove(cache_path)

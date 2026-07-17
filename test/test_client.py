@@ -35,3 +35,20 @@ def test_init_client_rejects_empty_store_url():
     config = Config(store_url="")
     with pytest.raises(ValueError):
         init_client(config=config)
+
+
+def test_local_client_rotate_persists_and_wraps(local_store_client, clean_store):
+    from .conftest import STATIC_DIR
+
+    uuid = local_store_client.upload((STATIC_DIR / "08-190641-4631.jpeg").read_bytes())
+    assert local_store_client.rotate(uuid, 90) == 90
+    assert local_store_client.rotate(uuid, 90) == 180
+    assert local_store_client.rotate(uuid, 270) == 90
+    assert local_store_client.get_meta(uuid).rotation == 90
+
+
+def test_local_client_rotate_unknown_uuid_raises(local_store_client, clean_store):
+    import pytest
+
+    with pytest.raises(ValueError):
+        local_store_client.rotate("does-not-exist", 90)

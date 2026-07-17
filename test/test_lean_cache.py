@@ -31,6 +31,7 @@ def test_lean_cache_upsert_and_query_by_month():
         "longitude": None,
         "extension": "jpeg",
         "scanned": 1_700_000_100,
+        "rotation": 0,
     }
     cache.upsert_many([row])
 
@@ -87,6 +88,7 @@ def test_web_client_sync_since_returns_lean_rows(web_client, clean_store):
         "longitude",
         "extension",
         "scanned",
+        "rotation",
     }
 
 

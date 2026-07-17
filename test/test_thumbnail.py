@@ -69,3 +69,31 @@ def test_web_client_fetch_thumbnail(web_client, clean_store):
     with Image.open(BytesIO(thumb)) as img:
         assert img.format == "JPEG"
         assert img.width * img.height <= 300_000 * 1.2
+
+
+def test_generate_thumbnail_auto_rotates_per_exif_orientation():
+    """25-121007-33d0.jpeg carries EXIF Orientation=6 (rotate 90 CW to
+    display correctly) and is physically stored landscape (1600x1200) -
+    the thumbnail must come out portrait (width < height) once corrected,
+    not just downscaled as-is."""
+    with open(STATIC_DIR / "25-121007-33d0.jpeg", "rb") as f:
+        original = f.read()
+    with Image.open(BytesIO(original)) as img:
+        assert img.getexif().get(0x0112) == 6
+        assert img.width > img.height  # stored sideways
+
+    thumb = generate_thumbnail(original, target_pixels=50_000)
+    with Image.open(BytesIO(thumb)) as img:
+        assert img.format == "JPEG"
+        assert img.width < img.height  # corrected to portrait
+
+
+def test_generate_thumbnail_applies_manual_rotation_on_top_of_exif():
+    with open(STATIC_DIR / "08-190641-4631.jpeg", "rb") as f:
+        original = f.read()
+    with Image.open(BytesIO(original)) as img:
+        original_size = img.size  # landscape, no EXIF orientation
+
+    thumb = generate_thumbnail(original, target_pixels=10_000_000_000, rotation=90)
+    with Image.open(BytesIO(thumb)) as img:
+        assert img.size == (original_size[1], original_size[0])

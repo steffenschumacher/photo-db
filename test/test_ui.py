@@ -134,6 +134,71 @@ def test_thumbnail_grid_lists_synced_photos(qapp, local_store_client, clean_stor
         lean_cache.close()
 
 
+def test_double_click_thumbnail_opens_image_viewer(
+    qapp, local_store_client, clean_store, test_config
+):
+    from photo_db.db.lean_cache import LeanCache
+    from photo_db.ui.thumbnail_grid import ThumbnailGridWidget
+
+    local_store_client.upload(_sample_bytes())
+
+    lean_cache = LeanCache(_ui_config(test_config.STORE_URL))
+    lean_cache.sync(local_store_client)
+
+    cache_dir = tempfile.mkdtemp()
+    grid = ThumbnailGridWidget(lean_cache, local_store_client, cache_dir)
+    try:
+        index = grid.model.index(0)
+        opened = {}
+
+        class _FakeDialog:
+            def __init__(self, client, uuid, parent=None):
+                opened["client"] = client
+                opened["uuid"] = uuid
+                self.rotated = _FakeSignal()
+
+            def exec(self):
+                opened["exec_called"] = True
+
+        class _FakeSignal:
+            def connect(self, _slot):
+                pass
+
+        import photo_db.ui.thumbnail_grid as thumbnail_grid_module
+
+        original_dialog_cls = thumbnail_grid_module.ImageViewerDialog
+        thumbnail_grid_module.ImageViewerDialog = _FakeDialog
+        try:
+            grid._on_double_clicked(index)
+        finally:
+            thumbnail_grid_module.ImageViewerDialog = original_dialog_cls
+
+        assert opened.get("exec_called") is True
+        assert opened["client"] is local_store_client
+        assert opened["uuid"]
+    finally:
+        lean_cache.close()
+
+
+def test_image_viewer_dialog_loads_and_rotates(qapp, local_store_client, clean_store):
+    from photo_db.ui.image_viewer import ImageViewerDialog
+
+    uuid = local_store_client.upload(_sample_bytes())
+    dlg = ImageViewerDialog(local_store_client, uuid)
+    try:
+        assert dlg._pixmap is not None
+        assert not dlg._pixmap.isNull()
+
+        rotated_uuids = []
+        dlg.rotated.connect(rotated_uuids.append)
+        dlg._rotate(90)
+
+        assert rotated_uuids == [uuid]
+        assert local_store_client.get_meta(uuid).rotation == 90
+    finally:
+        dlg.close()
+
+
 def test_scan_dialog_builds(qapp, test_config):
     from photo_db.ui.scan_dialog import ScanDialog
 

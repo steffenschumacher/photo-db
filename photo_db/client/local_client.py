@@ -18,13 +18,21 @@ class LocalPDBClient(AbstractPDBClient):
         return self.store.upload(image)
 
     def get(self, uuid: str) -> bytes:
-        return self.store.read_photo(self.get_meta(uuid))
+        ph = self.get_meta(uuid)
+        data, _ext = self.store.get_display_bytes(ph)
+        return data
 
     def get_thumbnail(self, uuid: str) -> bytes:
         return self.store.get_thumbnail(self.get_meta(uuid))
 
     def get_meta(self, uuid: str) -> Photo:
         return self.store.get_photo(uuid)
+
+    def rotate(self, uuid: str, delta: int) -> int:
+        ph = self.store.rotate(uuid, delta)
+        if ph is None:
+            raise ValueError(f"No photo with uuid: {uuid}")
+        return ph.rotation
 
     def hashes(self) -> dict[str, str]:
         return self.store.get_hashes()

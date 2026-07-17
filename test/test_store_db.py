@@ -95,3 +95,15 @@ def test_search_by_circle():
 
     far_away = db.search(circle=(ph.latitude + 90, ph.longitude, 0.01))
     assert far_away == []
+
+
+def test_update_rotation_persists_and_defaults_to_zero():
+    db = make_db()
+    ph = Photo.from_file(str(STATIC_DIR / "08-190641-4631.jpeg"))
+    db.insert_photo(ph)
+
+    fetched = db.get_photo(ph.uuid)
+    assert fetched.rotation == 0
+
+    db.update_rotation(ph.uuid, 90)
+    assert db.get_photo(ph.uuid).rotation == 90

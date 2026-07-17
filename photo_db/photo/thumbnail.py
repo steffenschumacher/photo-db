@@ -11,6 +11,8 @@ from io import BytesIO
 import pillow_heif
 from PIL import Image
 
+from .orientation import render_oriented
+
 pillow_heif.register_heif_opener()
 
 #: Target thumbnail size in pixels (width * height). ~300k px is enough
@@ -23,10 +25,17 @@ def generate_thumbnail(
     image_bytes: bytes,
     target_pixels: int = DEFAULT_TARGET_PIXELS,
     quality: int = DEFAULT_QUALITY,
+    rotation: int = 0,
 ) -> bytes:
     """Generate a JPEG thumbnail of ``image_bytes`` sized to approximately
     ``target_pixels`` total pixels, preserving aspect ratio. Never upscales
-    an already-smaller image."""
+    an already-smaller image.
+
+    Auto-rotates according to the source's EXIF orientation tag (if any),
+    plus an additional clockwise ``rotation`` (degrees) the user may have
+    applied on top of that - see ``photo_db.photo.orientation``.
+    """
+    image_bytes, _fmt = render_oriented(image_bytes, rotation)
     with Image.open(BytesIO(image_bytes)) as img:
         img = img.convert("RGB")
         width, height = img.size

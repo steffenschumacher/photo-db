@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -78,14 +79,20 @@ class ScanDialog(QDialog):
         self.resize(900, 500)
 
         self.import_path = QLineEdit()
-        pick_btn = QPushButton("Select..")
-        pick_btn.clicked.connect(self._pick_folder)
+        self.pick_btn = QPushButton("Select..")
+        self.pick_btn.clicked.connect(self._pick_folder)
         path_row = QHBoxLayout()
         path_row.addWidget(QLabel("Import path"))
         path_row.addWidget(self.import_path, 1)
-        path_row.addWidget(pick_btn)
+        path_row.addWidget(self.pick_btn)
 
         self.status_label = QLabel(f"Store: {config.STORE_URL}")
+
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 1)
+        self.progress.setValue(0)
+        self.progress.setTextVisible(False)
+        self.progress.setVisible(False)
 
         self.table = QTableWidget(0, len(_COLUMNS))
         self.table.setHorizontalHeaderLabels([c[0] for c in _COLUMNS])
@@ -104,6 +111,7 @@ class ScanDialog(QDialog):
         layout = QVBoxLayout()
         layout.addLayout(path_row)
         layout.addWidget(self.status_label)
+        layout.addWidget(self.progress)
         layout.addWidget(self.table, 1)
         layout.addLayout(btn_row)
         self.setLayout(layout)
@@ -127,6 +135,10 @@ class ScanDialog(QDialog):
             QMessageBox.critical(self, "Error starting scan", str(e))
             return
         self.start_btn.setEnabled(False)
+        self.pick_btn.setEnabled(False)
+        self.import_path.setEnabled(False)
+        self.progress.setRange(0, 0)  # indeterminate "busy" spinner while scanning
+        self.progress.setVisible(True)
         self.table.setRowCount(0)
         self.worker = ScanWorker(scanner, path, self)
         self.worker.photo_processed.connect(self._add_row)
@@ -147,11 +159,22 @@ class ScanDialog(QDialog):
         self.status_label.setText(
             f"Store: {self.config.STORE_URL} - done, processed {processed}/{detected} photos"
         )
-        self.start_btn.setEnabled(True)
+        self.progress.setRange(0, 1)
+        self.progress.setValue(1)
+        # Scan is complete: leave the start/pick/path controls disabled so
+        # the user can't re-trigger a scan from this dialog instance (per
+        # requirement, only Close should remain available at completion) -
+        # they can reopen the dialog for a new scan instead.
 
     def _on_failed(self, message: str):
         QMessageBox.critical(self, "Scan failed", message)
+        self.progress.setVisible(False)
+        # Unlike a normal completion, a failure is recoverable - re-enable
+        # the controls so the user can fix the issue (e.g. pick a
+        # different path) and retry without reopening the dialog.
         self.start_btn.setEnabled(True)
+        self.pick_btn.setEnabled(True)
+        self.import_path.setEnabled(True)
 
     def closeEvent(self, event):
         if self.worker and self.worker.isRunning():

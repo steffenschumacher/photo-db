@@ -58,7 +58,12 @@ shows which store is currently active (`Store (local|remote): <path/url>`):
   and infinite scroll, lazily fetching ~300k-pixel thumbnails
   (`photo_db/photo/thumbnail.py`, generated server-side at upload time,
   served via `GET /thumb/<uuid>`) in background threads as they scroll into
-  view, with a small on-disk client-side cache.
+  view, with a small on-disk client-side cache. Thumbnails and the full
+  image are always shown auto-rotated per EXIF orientation.
+- **Double-clicking a thumbnail** opens a full-image preview
+  (`ImageViewerDialog`) with "Rotate left"/"Rotate right" buttons; rotating
+  persists back to whichever store is configured (local or remote) and
+  refreshes the corresponding thumbnail immediately.
 - **Settings..** edits `Config` (store URL/credentials, hash size,
   similarity threshold, lean cache path) and persists changes to `.env`.
   Saving takes effect immediately — the store (local or remote), lean

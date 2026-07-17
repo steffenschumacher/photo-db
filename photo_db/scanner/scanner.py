@@ -193,7 +193,13 @@ class Scanner:
                 return False
             for central_hash, uuid in self.central_hashes.items():
                 if ph.similar_to_hash(central_hash):
-                    other: Photo = self.client.get_meta(uuid)
+                    other: Photo | None = self.client.get_meta(uuid)
+                    if other is None:
+                        # Stale central_hashes entry (e.g. the referenced
+                        # photo no longer exists in the store) - nothing
+                        # sound to compare against, so just skip it rather
+                        # than crash.
+                        continue
                     if other.preferable_to(ph):
                         ph.duplicate_src = "central"
                         ph.duplicate_uuid = uuid

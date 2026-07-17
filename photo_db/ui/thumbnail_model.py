@@ -75,3 +75,14 @@ class LeanPhotoListModel(QAbstractListModel):
                 idx = self.index(i)
                 self.dataChanged.emit(idx, idx, [Qt.ItemDataRole.DecorationRole])
                 break
+
+    def invalidate_thumbnail(self, uuid: str) -> None:
+        """Drop the cached thumbnail for ``uuid`` (e.g. after a rotation
+        change) and trigger a fresh fetch/render for whatever row(s)
+        currently show it."""
+        self.loader.invalidate(uuid)
+        for i, row in enumerate(self._rows):
+            if row["uuid"] == uuid:
+                idx = self.index(i)
+                self.dataChanged.emit(idx, idx, [Qt.ItemDataRole.DecorationRole])
+                break

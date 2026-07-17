@@ -17,6 +17,12 @@ class AbstractPDBClient:
     def get_meta(self, uuid: str) -> Photo:
         raise NotImplementedError("")
 
+    def rotate(self, uuid: str, delta: int) -> int:
+        """Apply an additional clockwise ``delta`` degrees rotation to the
+        photo with the given uuid, persisted back to the store. Returns
+        the new cumulative rotation (degrees)."""
+        raise NotImplementedError("")
+
     def hashes(self) -> dict[str, str]:
         raise NotImplementedError("")
 

@@ -32,10 +32,21 @@ class Photo(BaseModel):
     hash: str
     extension: str
     scanned: datetime
+    #: Additional clockwise rotation (degrees: 0/90/180/270) applied on top
+    #: of EXIF auto-orientation, for cases where the camera didn't record
+    #: orientation correctly - set via the desktop UI's preview popup and
+    #: persisted back to whichever store (local or remote) is configured.
+    rotation: int = 0
     #
     _img_hash: ImageHash = PrivateAttr()
     _path: str = PrivateAttr()
     _config: Config = PrivateAttr()
+    #: {clockwise_degrees: hash_string} for this photo's hash computed at
+    #: each 90-degree rotation of the raw pixel grid - only populated for
+    #: freshly-scanned candidates (see ``from_file``), used to detect
+    #: duplicates that are the same photo physically rotated by some other
+    #: tool. Never persisted (transient, upload-time-only concern).
+    _rotation_hash_variants: dict[int, str] = PrivateAttr(default_factory=dict)
 
     def __str__(self):
         return f"Photo({self.db_path()}, {self.width}x{self.height}, {self.date}, {self.camera})"
@@ -45,6 +56,7 @@ class Photo(BaseModel):
         data.setdefault("scanned", datetime.now())
         path = data.pop("path", None)
         config = data.pop("config", None) or default_config
+        rotation_hash_variants = data.pop("rotation_hash_variants", None)
         for k in ["date", "scanned"]:
             if dt_val := data.pop(k, None):
                 if isinstance(dt_val, float):
@@ -58,6 +70,7 @@ class Photo(BaseModel):
         if len(self.hash.split("-")) < 4:
             self._img_hash = image_hash_from(self.hash, config)
         self._path = path
+        self._rotation_hash_variants = rotation_hash_variants or {}
 
     def similar_to(self, other: "Photo") -> bool:
         if not isinstance(other, self.__class__):
@@ -107,14 +120,15 @@ class Photo(BaseModel):
             else:
                 raise ValueError(f"{img_file} is not a valid type: {type(img_file)}")
             la, lo, al = parse_gps(tags, path)
-            ext, str_hash, x, y = parse_ext_hash_dimensions(img_file, config)
+            ext, hash_variants, x, y = parse_ext_hash_dimensions(img_file, config)
             args = {
                 "camera": parse_camera(tags, path),
                 "date": parse_date(tags, path),
                 "latitude": la,
                 "longitude": lo,
                 "altitude": al,
-                "hash": str_hash,
+                "hash": hash_variants[0],
+                "rotation_hash_variants": hash_variants,
                 "width": x,
                 "height": y,
                 "path": path,
@@ -128,6 +142,17 @@ class Photo(BaseModel):
     @property
     def path(self) -> str:
         return self._path
+
+    def hash_variants(self) -> dict[int, str]:
+        """Mapping of ``{clockwise_degrees: hash_string}`` for this photo's
+        hash computed at each 90-degree rotation of the raw pixel grid -
+        used to detect duplicates that are the same photo physically
+        rotated/re-saved by some other tool (see ``LocalStore.check_hash``).
+        Only populated for freshly-scanned candidates (``from_file()``);
+        photos loaded from the store fall back to just their canonical
+        ``{0: self.hash}`` since the source image bytes aren't at hand to
+        compute the other rotations."""
+        return self._rotation_hash_variants or {0: self.hash}
 
     @property
     def gps(self) -> str:
@@ -162,6 +187,7 @@ class Photo(BaseModel):
             "longitude": self.longitude,
             "extension": self.extension,
             "scanned": self.scanned.timestamp(),
+            "rotation": self.rotation,
         }
 
     def filename(self) -> str:
@@ -189,7 +215,12 @@ class LocalPhoto(Photo):
         cls, img_file: BytesIO | str, path: str = None, config: Config = default_config
     ) -> "LocalPhoto":
         ph = super().from_file(img_file, path, config)
-        return LocalPhoto(**ph.model_dump(), path=ph.path, config=config)
+        return LocalPhoto(
+            **ph.model_dump(),
+            path=ph.path,
+            config=config,
+            rotation_hash_variants=ph.hash_variants(),
+        )
 
     def __str__(self):
         return (

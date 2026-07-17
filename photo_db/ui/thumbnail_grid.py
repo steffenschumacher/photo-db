@@ -20,7 +20,8 @@ from PySide6.QtWidgets import (
 from photo_db.client import AbstractPDBClient
 from photo_db.db.lean_cache import LeanCache
 from photo_db.ui.filters import month_label
-from photo_db.ui.thumbnail_model import LeanPhotoListModel
+from photo_db.ui.image_viewer import ImageViewerDialog
+from photo_db.ui.thumbnail_model import LeanPhotoListModel, UuidRole
 
 _ICON_SIZE = QSize(160, 160)
 
@@ -46,6 +47,7 @@ class ThumbnailGridWidget(QWidget):
         self.view.setSpacing(6)
         self.view.setMovement(QListView.Movement.Static)
         self.view.verticalScrollBar().valueChanged.connect(self._on_scroll)
+        self.view.doubleClicked.connect(self._on_double_clicked)
 
         self.month_picker = QComboBox()
         self.month_picker.currentIndexChanged.connect(self._on_month_picked)
@@ -122,3 +124,11 @@ class ThumbnailGridWidget(QWidget):
         if 0 <= self._month_index < len(self._months):
             return self._months[self._month_index]
         return None
+
+    def _on_double_clicked(self, index) -> None:
+        if not index.isValid():
+            return
+        uuid = index.data(UuidRole)
+        dlg = ImageViewerDialog(self.model.loader.client, uuid, self)
+        dlg.rotated.connect(self.model.invalidate_thumbnail)
+        dlg.exec()

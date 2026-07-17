@@ -78,6 +78,12 @@ class WebPDBClient(AbstractPDBClient):
         self.process_response(r)
         return Photo(**_response_json(r), config=self.config)
 
+    def rotate(self, uuid: str, delta: int) -> int:
+        url = f"{self.url}/rotate/{uuid}"
+        r = self.client.post(url, json={"delta": delta}, **self.http_kwargs)
+        self.process_response(r)
+        return _response_json(r)["rotation"]
+
     def hashes(self) -> dict[str, str]:
         url = f"{self.url}/hashes"
         r = self.client.get(url, **self.http_kwargs)
@@ -107,3 +113,9 @@ class WebPDBClient(AbstractPDBClient):
                 raise ValueError(f"Invalid exception json: {json}")
         elif hasattr(r, "raise_for_status"):
             r.raise_for_status()
+        elif r.status_code >= 400:
+            # Flask's test client (used by tests, via RequestsClient) has no
+            # raise_for_status() - surface non-2xx/409 responses ourselves
+            # so callers (e.g. rotate() on an unknown uuid -> 404) don't
+            # silently fall through to indexing a None JSON body.
+            raise ValueError(f"Request failed with status {r.status_code}: {_response_content(r)}")

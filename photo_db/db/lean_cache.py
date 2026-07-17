@@ -30,6 +30,7 @@ _table = {
     "longitude": "float",
     "extension": "VARCHAR(5) NOT NULL",
     "scanned": "int(4) NOT NULL",
+    "rotation": "int NOT NULL DEFAULT 0",
 }
 _fields = list(_table.keys())
 _select = f"SELECT {','.join(_fields)} FROM lean_photo"
@@ -78,6 +79,12 @@ class LeanCache:
                 self.cnx.execute(f"CREATE TABLE IF NOT EXISTS lean_photo ({fields});")
                 self.cnx.execute("CREATE INDEX index_lean_hash ON lean_photo(hash);")
                 self.cnx.execute("CREATE INDEX index_lean_date ON lean_photo(date);")
+            else:
+                # Migrate older caches created before a column existed.
+                existing = {row[1] for row in self.cnx.execute("PRAGMA table_info(lean_photo);")}
+                for field, ddl in _table.items():
+                    if field not in existing:
+                        self.cnx.execute(f"ALTER TABLE lean_photo ADD COLUMN {field} {ddl};")
             self.cnx.execute(_meta_table_ddl)
             self.cnx.commit()
 

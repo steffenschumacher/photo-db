@@ -1,3 +1,7 @@
+import tempfile
+
+from photo_db.config import Config
+from photo_db.db.lean_cache import LeanCache
 from photo_db.scanner import Scanner
 from photo_db.scanner.scanner import Scanner as ScannerClass
 
@@ -8,6 +12,15 @@ def _bare_scanner() -> ScannerClass:
     # Bypass __init__ (which needs a real client/thread pool) since
     # is_possible_image() is a pure function of the filename.
     return ScannerClass.__new__(ScannerClass)
+
+
+def _fresh_lean_cache() -> LeanCache:
+    # test_config's lean_cache_path is session-scoped/shared - tests that
+    # drive a real Scanner need their own throwaway cache, or hash entries
+    # from an earlier test's (now clean_store-wiped) uploads would still
+    # look like "known" central photos here, and the "similar to a stale
+    # uuid" cross-talk would then also crash on the now-missing metadata.
+    return LeanCache(Config(lean_cache_path=tempfile.mktemp(suffix=".db")))
 
 
 def test_is_possible_image_recognizes_supported_extensions(tmp_path):
@@ -36,7 +49,7 @@ def test_is_possible_image_ignores_missing_and_appledouble_files(tmp_path):
 
 
 def test_scan(local_store_client, clean_store, test_config):
-    sc = Scanner(local_store_client, config=test_config)
+    sc = Scanner(local_store_client, config=test_config, lean_cache=_fresh_lean_cache())
 
     folder = str(STATIC_DIR)
     sc.scan_dir(folder)
@@ -68,7 +81,7 @@ def test_scan_from_a_different_thread_than_construction(
     tolerate that (sqlite connections aren't cross-thread safe by default)."""
     from threading import Thread
 
-    sc = Scanner(local_store_client, config=test_config)
+    sc = Scanner(local_store_client, config=test_config, lean_cache=_fresh_lean_cache())
     folder = str(STATIC_DIR)
     errors = []
 
