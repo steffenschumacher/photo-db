@@ -5,6 +5,7 @@ from os.path import join
 from pathlib import Path
 from unittest import mock
 
+import pytest
 from flask import Flask
 from pytest import fixture
 
@@ -91,3 +92,18 @@ def clean_store(test_config):
 
 def nearly_equals(a: float, b: float, tolerance: float = 0.001) -> bool:
     return abs(a - b) < tolerance
+
+
+@fixture(scope="session")
+def qapp():
+    """A single, session-wide QApplication for GUI smoke tests. Uses Qt's
+    "offscreen" platform plugin so tests can run without a real display
+    (e.g. in CI)."""
+    import os
+
+    pytest.importorskip("PySide6")
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance() or QApplication([])
+    yield app

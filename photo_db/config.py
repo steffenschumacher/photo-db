@@ -1,5 +1,5 @@
 import tempfile
-from os.path import expanduser, join
+from os.path import exists, expanduser, join
 
 from dotenv import load_dotenv
 from environs import Env
@@ -74,6 +74,27 @@ class Config:
 
         msg = f"Config({', '.join(strings)})"
         return msg
+
+    def save_env_file(self, path: str = ".env") -> None:
+        """Persist the current settings as ``PH_*`` variables in a
+        dotenv file, creating it if necessary. Used by the desktop UI's
+        Settings dialog so changes survive across app restarts."""
+        from dotenv import set_key
+
+        if not exists(path):
+            open(path, "a").close()
+        pairs = {
+            "PH_STORE_URL": self.STORE_URL,
+            "PH_SSL_VERIFY": str(self.SSL_VERIFY),
+            "PH_STORE_USER": self.STORE_USER,
+            "PH_STORE_PASS": self.STORE_PASS,
+            "PH_HASH_SIZE": str(self.HASH_SIZE),
+            "PH_SIMILARITY": str(self.SIMILARITY),
+            "PH_LEAN_CACHE_PATH": self.LEAN_CACHE_PATH,
+        }
+        for key, value in pairs.items():
+            if value is not None:
+                set_key(path, key, str(value))
 
 
 # Default, process-wide instance built from environment variables at import

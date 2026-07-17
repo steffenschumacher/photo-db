@@ -32,9 +32,9 @@ raw = [
     "rawpy>=0.23",
     "imageio>=2.35",
 ]
-# Unfinished wxPython desktop UI - experimental, not required for CLI/API use.
+# PySide6 (Qt) desktop "thick client" UI - not required for CLI/API use.
 ui = [
-    "wxpython>=4.2.1",
+    "pyside6>=6.7",
 ]
 
 [dependency-groups]

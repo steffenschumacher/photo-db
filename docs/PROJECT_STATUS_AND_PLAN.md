@@ -34,6 +34,9 @@ proposal:
   fixed since they were trivial and clearly bugs, not scope creep). No new
   UI functionality was added. The recommendation to prefer the CLI/API
   surface over finishing the wx UI still stands.
+  **Update (later session):** the user asked to pick this back up. The
+  wxPython prototype was replaced (not extended) with a PySide6 desktop
+  app — see "Desktop UI rewrite" addendum below.
 - **Naming scheme**: implemented as zero-padded `YYYY/MM` folders plus a
   fixed-width numeric filename prefix (day-of-month + hour + minute + second
   + millisecond, no separators, e.g. `08190641000_2978.jpeg`, where the
@@ -77,7 +80,65 @@ proposal:
 | Flask HTTP API (`api/web_store.py`, `app.py`) | **~70% done** | Routes exist for all client operations; no rate limiting, no HTTPS enforcement (relies on being reverse-proxied), errors from `LocalStore.upload` are only ever `print()`ed then silently return `None` (client gets a 200 with an empty body instead of an error). |
 | CLI scanner (`pdbscanner.py`) | **~80% done**, workable | Argument parsing is fine; mutates `Config` class attributes at runtime, which is fragile (shared mutable global config; not thread/test-safe — see §2.5). |
 | Reverse geocoding (`geocoding/nominatim.py`) | **Done for its narrow purpose** | Thin wrapper, no caching, no error handling if geocoding fails/rate-limits (Nominatim's public instance is rate-limited to 1 req/s — no throttling/backoff here). Used only by tests/manual tooling, not by the main scan pipeline. |
-| Desktop UI (`photo_db/ui/`) | **~25% done — prototype only** | See §2.6. `ImportFrame`/`ScanInitDialog` are a rough first pass: no way to actually browse/select a scan folder in the frame flow shown, hardcoded absolute path to an icon file (`/Users/stsmr/PyCharmProjects/...`), no packaging/entry point, "Load existing scan" menu item is a no-op stub. |
+| Desktop UI (`photo_db/ui/`) | **~25% done — prototype only** | See §2.6. `ImportFrame`/`ScanInitDialog` are a rough first pass: no way to actually browse/select a scan folder in the frame flow shown, hardcoded absolute path to an icon file (`/Users/stsmr/PyCharmProjects/...`), no packaging/entry point, "Load existing scan" menu item is a no-op stub. **Update (later session): rewritten from scratch on PySide6** (this wxPython prototype was removed) — see "Desktop UI rewrite" addendum below. |
+
+## 0a. Desktop UI rewrite (later session addendum)
+
+Picked up after the six phases above, on explicit user request, with the
+requirement to reconsider the framework choice (little of the wxPython
+prototype was reusable — confirmed by review, it was ~325 lines and only a
+progress table, no thumbnails/browsing). **PySide6** was chosen over
+wxPython/PyQt6 for its LGPL license and because `QAbstractListModel` +
+`QListView` (icon mode) + `QThreadPool` is the idiomatic Qt pattern for a
+virtualized, lazily-loaded thumbnail grid — directly matching the
+requirement to lazy-load thumbnails by visible date range.
+
+Built, in order:
+
+1. **Thumbnails** (`photo_db/photo/thumbnail.py`): ~300k-pixel JPEG,
+   generated server-side at upload time (`LocalStore.upload()`), cached in a
+   uuid-keyed `.thumbs/<year>/<month>/` tree parallel to originals (so it
+   survives naming/date corrections), served via `GET /thumb/<uuid>` with
+   ETag caching (hash as ETag), with lazy regenerate-and-cache backfill for
+   pre-existing photos.
+2. **Lean incremental sync** (`photo_db/db/lean_cache.py`): a local sqlite
+   cache of metadata-only rows (`Photo.lean_dict()`), synced page-by-page
+   from `GET /sync?since=&limit=` using the server-side upload timestamp as
+   a monotonic cursor (capture date isn't monotonic for backfilled imports,
+   so it can't be used as the sync cursor). Lets the thick client determine
+   locally whether a candidate photo already exists (cheap duplicate
+   pre-check before hashing) and browse the library offline. Made
+   thread-safe (`check_same_thread=False` + a lock) since `Scanner`'s
+   worker pool calls into it concurrently.
+3. **Scanner wiring**: `Scanner.central_hashes` now sources from
+   `LeanCache.sync()` + `.hashes()` instead of a full `client.hashes()`
+   refetch every scan, and warms the cache after each successful upload.
+4. **PySide6 UI** (`photo_db/ui/`): `MainWindow` (menu: Scan folder..,
+   Sync library.., Settings..), `ScanDialog` (folder picker + live progress
+   table, `Scanner` run in a `QThread`), `SettingsDialog` (edits `Config`,
+   persists to `.env` via `Config.save_env_file()`), `ThumbnailGridWidget`
+   (`QListView` icon mode over `LeanPhotoListModel`, a year/month picker
+   plus infinite scroll — both coexist per the user's explicit
+   clarification), `ThumbnailLoader` (`QThreadPool`-backed background fetch
+   + small on-disk cache, decoding pixmaps only on the main thread since
+   that's not safe off the GUI thread on all platforms).
+5. Entry point: `photodb-ui.py` (`uv run python photodb-ui.py`, requires
+   `uv sync --extra ui`).
+
+GUI smoke tests (`test/test_ui.py`, `@pytest.mark.gui`, using Qt's
+"offscreen" platform plugin) plus framework-agnostic unit tests for the
+display-formatting helpers (`test/test_ui_filters.py`) were added; the `ui`
+extra is not installed in CI (kept out to avoid a large Qt binary download
+plus system library requirements for the offscreen platform on the CI
+runner) so these are a manual/local check (`QT_QPA_PLATFORM=offscreen uv
+run pytest -m gui`) for now — a follow-up could add a dedicated CI job with
+the required `libegl1`/`libxkbcommon0` system packages if that's wanted.
+
+Deliberately deferred / left as future work: a client-side "supersede"
+workflow for near-duplicates (the pre-existing scanner quirk where a
+"preferable" near-duplicate is uploaded alongside rather than replacing the
+original — out of scope, left as-is), drag-and-drop import, and any kind of
+multi-select/batch actions (delete, tag) in the thumbnail grid.
 | `photo_db/cli/__init__.py` | **Dead code** | References `read_config`/`load_config` that don't exist anywhere in the codebase — this module cannot run. Looks like an abandoned earlier CLI design, superseded by `pdbscanner.py`. |
 | Tests | **~20% effectively passing** | See §3 — tests exist and mostly *can* pass, but only if run from inside `test/` (no `pytest.ini`/`pyproject.toml` sets `rootdir`/`testpaths`), and the two `ui/` tests open real, blocking OS GUI windows (`wx.App().MainLoop()`) rather than testing anything programmatically — they will hang indefinitely in CI or any non-interactive environment. |
 | Packaging / dependency management | **Legacy** | Two virtualenvs checked into the repo (`venv/`, `venv311/`), split `requirements*.txt` files that have already drifted from each other (see diff in §2.7), no `pyproject.toml`, no lockfile, no declared Python version. |

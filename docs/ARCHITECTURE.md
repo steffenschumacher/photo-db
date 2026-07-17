@@ -71,10 +71,27 @@ so that clearly-duplicate or clearly-inferior images never have to be uploaded.
    - Records status (`detected`, `exif`, `duplicate`, `similar`, `uploaded`,
      `rejected`, `ignored`) per file in an in-memory sqlite `ScanDB
      (photo_db/db/scanner.py)` so a scan run can be reviewed/replayed.
-9. **Optional desktop UI (wxPython, unfinished).** A `wx`-based UI
-   (`photo_db/ui/`) was started to let a non-technical user pick an import
-   folder/library and watch a scan progress in a table. This was never
-   finished — see status doc.
+9. **Thumbnails + lean incremental sync (thick-client foundation).**
+   `LocalStore.upload()` generates a ~300k-pixel JPEG thumbnail alongside
+   each original (`photo_db/photo/thumbnail.py`), cached in a uuid-keyed
+   `.thumbs/<year>/<month>/` tree parallel to the originals (kept separate
+   from the date-derived filename tree so it survives naming/date
+   corrections), served via `GET /thumb/<uuid>`. `StoreDB.since()` /
+   `GET /sync?since=&limit=` expose lean (metadata-only) rows paginated by
+   the server-side upload timestamp, which `LeanCache`
+   (`photo_db/db/lean_cache.py`) syncs into a local sqlite cache the thick
+   client queries offline for duplicate pre-checks and browsing.
+10. **Desktop UI (PySide6 "thick client").** `photo_db/ui/` lets a user
+    scan a folder and adopt new photos into a local or remote store (reusing
+    `Scanner`, which now sources its dedup pre-check from the incrementally
+    synced `LeanCache` rather than a full metadata refetch per scan), and
+    browse the library via a `QAbstractListModel`/`QListView`-backed
+    thumbnail grid with a year/month picker plus infinite scroll, fetching
+    thumbnails lazily in background threads (`QThreadPool`) as they scroll
+    into view. Replaces an earlier, unfinished wxPython prototype (kept only
+    as git history) — PySide6 was chosen for its LGPL license and because
+    `QAbstractListModel` + `QThreadPool` is the idiomatic Qt pattern for a
+    virtualized, lazily-loaded grid.
 
 ## Component map
 
@@ -93,7 +110,9 @@ so that clearly-duplicate or clearly-inferior images never have to be uploaded.
 | Reverse geocoding helper (address → lat/lon, used by tests/tools) | `photo_db/geocoding/nominatim.py` |
 | CLI scanner entry point | `pdbscanner.py` |
 | Config (instantiable, DI, env-driven defaults) | `photo_db/config.py` |
-| Unfinished desktop UI | `photo_db/ui/*` |
+| Thumbnail generation | `photo_db/photo/thumbnail.py` |
+| Lean incremental sync cache (thick-client dedup/browse) | `photo_db/db/lean_cache.py` |
+| Desktop UI (PySide6) | `photo_db/ui/*`, entry point `photodb-ui.py` |
 
 ## Deployment shape
 

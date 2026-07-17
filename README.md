@@ -24,8 +24,10 @@ Python 3.13 + `uv` + `ruff` toolchain, pydantic v2, bug fixes (SQL injection/
 syntax bugs, swallowed upload errors, hardcoded credentials, `send_file`
 crash), the intended naming/foldering scheme, HEIC EXIF read/write, RAW
 (`.ARW`) conversion wired into the scan pipeline, a fully instance-based/
-dependency-injected `Config`, a real test suite (40 tests, 67% coverage),
-and pre-commit hooks + CI. See:
+dependency-injected `Config`, thumbnail generation + a lean, incrementally-
+syncable local metadata cache (the foundation of the desktop UI, see below),
+a PySide6 desktop "thick client", a real test suite (60+ tests), and
+pre-commit hooks + CI. See:
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — design & how the pieces
   fit together.
@@ -34,10 +36,38 @@ and pre-commit hooks + CI. See:
   the top describing what was actually built and a few decisions that
   differ from the initial proposal.
 
-The wxPython desktop UI (`photo_db/ui/`) remains an unfinished prototype by
-explicit decision — the CLI (`pdbscanner.py`) and Flask HTTP API are the
-supported ways to use this project; only trivial lint/bug fixes were applied
-to the UI code, no new UI functionality was added.
+## Desktop UI (thick client)
+
+`photo_db/ui/` is a PySide6 (Qt) desktop app for maintaining a photo library
+both locally and against a remote web backend:
+
+- **Scan folder..** recursively scans a chosen directory and adopts any
+  photos not already present in the configured store (local path or remote
+  webservice), reusing the same `Scanner`/duplicate-detection pipeline as
+  `pdbscanner.py`, with a live progress table.
+- **Sync library..** pulls incremental metadata (no image bytes) from the
+  central store into a local sqlite "lean cache"
+  (`photo_db/db/lean_cache.py`), so the client can determine locally
+  whether a candidate photo already exists (cheap duplicate pre-check
+  before hashing) and browse the library offline.
+- The central thumbnail grid browses the lean cache by year/month (picker)
+  and infinite scroll, lazily fetching ~300k-pixel thumbnails
+  (`photo_db/photo/thumbnail.py`, generated server-side at upload time,
+  served via `GET /thumb/<uuid>`) in background threads as they scroll into
+  view, with a small on-disk client-side cache.
+- **Settings..** edits `Config` (store URL/credentials, hash size,
+  similarity threshold, lean cache path) and persists changes to `.env`.
+
+Requires the `ui` extra (`uv sync --extra ui`); launch with:
+
+```bash
+uv run python photodb-ui.py
+```
+
+wxPython was the original (abandoned) choice for this UI; PySide6 was
+chosen for the rewrite for its LGPL licensing and `QListView`/
+`QAbstractListModel`/`QThreadPool` support, which is the idiomatic Qt
+pattern for a virtualized, lazily-loaded thumbnail grid.
 
 ## Quick start
 
@@ -50,6 +80,7 @@ uv sync
 # ...or include the optional extras you need:
 uv sync --extra api    # Flask HTTP API server
 uv sync --extra raw    # Sony .ARW (and similar) RAW photo conversion
+uv sync --extra ui     # PySide6 desktop "thick client"
 
 # Run a scan of a local folder into a local library folder:
 uv run python pdbscanner.py -s /path/to/photos/to/import -l /path/to/library

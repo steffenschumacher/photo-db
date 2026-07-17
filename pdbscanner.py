@@ -45,7 +45,7 @@ if __name__ == "__main__":
     from photo_db.scanner import Scanner
 
     client = init_client(config=config)
-    sc = Scanner(client)
+    sc = Scanner(client, config=config)
     t1 = time()
     print(config.info())
     sc.scan_dir(args.scanpath)
