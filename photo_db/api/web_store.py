@@ -2,11 +2,12 @@ from datetime import UTC, datetime
 from io import BytesIO
 from json import loads
 
-from flask import Flask, request, send_file
+from flask import Flask, Response, request, send_file
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.exceptions import NotFound
 
 from ..config import Config, default_config
+from ..exceptions import DuplicateException
 from ..photo import Photo
 from ..store.logic import LocalStore
 
@@ -14,6 +15,14 @@ from ..store.logic import LocalStore
 def add_routes(app: Flask, config: Config = default_config):
     store = LocalStore(config)
     auth = HTTPBasicAuth()
+
+    @app.errorhandler(DuplicateException)
+    def handle_duplicate(err: DuplicateException):
+        # DuplicateException/SimilarException are plain, framework-free
+        # exceptions (see photo_db.exceptions) so core scanning/storage
+        # code doesn't need werkzeug installed - translate them into the
+        # HTTP 409 + JSON wire format WebPDBClient.process_response expects.
+        return Response(err.to_json(), status=err.code, mimetype="application/json")
 
     @auth.verify_password
     def authenticate(username, password):

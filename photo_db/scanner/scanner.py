@@ -9,12 +9,12 @@ from time import time
 from traceback import print_exc
 from uuid import uuid4
 
-from photo_db.api import DuplicateException, SimilarException
 from photo_db.client import AbstractPDBClient, init_client
 from photo_db.config import Config, default_config
 from photo_db.constants import IGNORABLE_EXTS
 from photo_db.db.lean_cache import LeanCache
 from photo_db.db.scanner import ScanDB
+from photo_db.exceptions import DuplicateException, SimilarException
 from photo_db.photo import LocalPhoto, Photo
 
 _ignore_pat = compile(r".*(\.AppleDouble).*", IGNORECASE)

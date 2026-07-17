@@ -4,7 +4,7 @@ from shutil import which
 import pytest
 from pytest import raises
 
-from photo_db.api import DuplicateException, SimilarException
+from photo_db.exceptions import DuplicateException, SimilarException
 from photo_db.geocoding.nominatim import get_coords
 from photo_db.photo import LocalPhoto, Photo
 from photo_db.photo.exif_tags import update_exif

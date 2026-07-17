@@ -3,9 +3,9 @@ from io import BytesIO
 from os import chown, makedirs
 from os.path import dirname, exists, join, sep
 
-from ..api import DuplicateException, SimilarException
 from ..config import Config, default_config
 from ..db.store import StoreDB
+from ..exceptions import DuplicateException, SimilarException
 from ..photo import Photo
 from ..photo.thumbnail import generate_thumbnail
 

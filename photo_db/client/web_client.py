@@ -2,8 +2,8 @@ from io import BytesIO
 
 from requests import Response, get, post
 
-from ..api import DuplicateException, SimilarException
 from ..config import Config, default_config
+from ..exceptions import DuplicateException, SimilarException
 from ..photo import Photo
 from .abstract_client import AbstractPDBClient
 
