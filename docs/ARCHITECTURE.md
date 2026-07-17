@@ -83,7 +83,7 @@ so that clearly-duplicate or clearly-inferior images never have to be uploaded.
 | Photo model, hashing, filename/foldering rules | `photo_db/photo/photo.py`, `photo_db/photo/parsers.py` |
 | EXIF/GPS parsing & writing | `photo_db/photo/parsers.py`, `photo_db/photo/exif_tags.py` |
 | RAW (`.ARW`) → JPEG conversion | `photo_db/photo/arw_converter.py` |
-| HEIC handling (stub) | `photo_db/photo/pil_tags.py` |
+| HEIC handling (read + write EXIF/GPS) | `photo_db/photo/pil_tags.py` |
 | Directory scanning + in-scan/central dedup logic | `photo_db/scanner/scanner.py` |
 | Scan-session sqlite log | `photo_db/db/scanner.py` |
 | Library sqlite persistence (hash/meta lookup) | `photo_db/db/store.py` |
@@ -92,9 +92,8 @@ so that clearly-duplicate or clearly-inferior images never have to be uploaded.
 | Flask HTTP API (server side of "remote" library) | `photo_db/api/web_store.py`, `photo_db/app.py` |
 | Reverse geocoding helper (address → lat/lon, used by tests/tools) | `photo_db/geocoding/nominatim.py` |
 | CLI scanner entry point | `pdbscanner.py` |
-| Config (env-driven) | `photo_db/config.py` |
+| Config (instantiable, DI, env-driven defaults) | `photo_db/config.py` |
 | Unfinished desktop UI | `photo_db/ui/*` |
-| Legacy/likely-dead CLI stub | `photo_db/cli/__init__.py` |
 
 ## Deployment shape
 

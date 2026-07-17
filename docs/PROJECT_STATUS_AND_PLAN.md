@@ -4,6 +4,62 @@ Audit date: 2026-07-16. This is a from-scratch code read + targeted test runs
 (no git history was available — the working copy is not an initialized git
 repository).
 
+## 0. Completion summary (update)
+
+All six phases of the plan below (§4) have now been implemented and are
+committed to git. Sections 1–3 and 5 below are kept as-written for
+historical/audit context (they describe the state *before* this work), with
+inline "**Fixed:**"/"**Done:**" notes added where the finding has since been
+resolved. The plan in §4 has been annotated phase-by-phase with what was
+actually built, including a few decisions that differ from the original
+proposal:
+
+- **Config** was refactored to a fully instantiable, dependency-injected
+  class (`photo_db.config.Config`), not the lighter-weight
+  "keep class attributes, add a lazy-reload metaclass" option that was also
+  on the table — the user explicitly chose the bigger DI refactor for real
+  test/concurrency isolation. A module-level `default_config = Config()`
+  singleton is kept for call sites that don't need an override, so most
+  existing call patterns still work unchanged.
+- **RAW (`.ARW`) conversion** ended up using `rawpy`/`imageio` (already a
+  declared optional dependency, `raw` extra) instead of shelling out to
+  `exiftool`; `photo_db/photo/arw_converter.py` was already written against
+  `rawpy` at audit time, it just wasn't wired into `Scanner` — that wiring is
+  now done, wrapped in a `try/except (ValueError, ImportError,
+  ModuleNotFoundError)` so a missing `rawpy` install gracefully rejects RAW
+  files rather than crashing the scan thread.
+- **wxPython desktop UI**: per explicit user decision, **not** finished.
+  Only lint/hygiene cleanup was applied (real bugs like a missing
+  `datetime` import and a hardcoded developer-machine icon path were still
+  fixed since they were trivial and clearly bugs, not scope creep). No new
+  UI functionality was added. The recommendation to prefer the CLI/API
+  surface over finishing the wx UI still stands.
+- **Naming scheme**: implemented as zero-padded `YYYY/MM` folders plus a
+  fixed-width numeric filename prefix (day-of-month + hour + minute + second
+  + millisecond, no separators, e.g. `08190641000_2978.jpeg`, where the
+  trailing `_2978` is the last 4 characters of the photo's UUID used as a
+  same-millisecond disambiguator) rather than the literal
+  `day-of-week-HH:MM:SS.mmmm_` spec, specifically to avoid the
+  colon-in-filename portability problem raised in §5 while still sorting
+  correctly both by folder and by filename. See §5 for the full rationale.
+- Test coverage went from ~20% effectively-passing/hanging to **40 passing
+  tests, 67% line coverage**, with all previously-hanging GUI tests properly
+  marked `@pytest.mark.gui` and excluded from the default run (not deleted,
+  since some assert real, previously-missing-import bugs like the
+  `ui/filters.py` `datetime` fix).
+- Secret-scanning: `detect-secrets` was used instead of `gitleaks` for the
+  pre-commit hook, because `gitleaks`'s pre-commit hook needs to download a
+  Go binary at hook-install time, which failed in this sandboxed dev
+  environment due to TLS interception; `detect-secrets` is pure Python and
+  installs the same way as every other hook. Either works fine in a normal
+  CI runner; `detect-secrets` was simply the more portable, dependency-free
+  choice here.
+- **Reminder**: the real, leaked `STORE_USER`/`STORE_PASS` credentials found
+  hardcoded as defaults in `Config` (removed in this pass — see §2.4) should
+  still be rotated at the source (wherever the real server accepts them) if
+  that hasn't already been done. This assistant cannot verify or action that
+  rotation itself.
+
 ## 1. Component-by-component status
 
 | Component | Status | Notes |
@@ -230,7 +286,7 @@ config wiring it into a required threshold or CI gate.
 
 ## 4. Prioritized completion plan
 
-### Phase 0 — Make the repo a real, safe, reproducible project
+### Phase 0 — Make the repo a real, safe, reproducible project ✅ Done
 1. `git init` this project (it currently has no version control at all) and
    add a proper `.gitignore` (venvs, `__pycache__`, `.env`, `.idea`,
    `*.pyc`, `coverage_html_report/`, the stray `https:/` dir,
@@ -241,7 +297,7 @@ config wiring it into a required threshold or CI gate.
 3. Delete committed virtualenvs (`venv/`, `venv311/`) and stray artifacts
    (`https:/`, `photodb-import.tgz`, `__pycache__/`, `.DS_Store`s).
 
-### Phase 1 — Modernize tooling (Python 3.13, `uv`, `ruff`)
+### Phase 1 — Modernize tooling (Python 3.13, `uv`, `ruff`) ✅ Done
 1. Add a `pyproject.toml`:
    - `requires-python = ">=3.13"`, project metadata, and consolidate
      `requirements.txt`/`requirements-api.txt`/`requirements-dev.txt` into
@@ -268,7 +324,7 @@ config wiring it into a required threshold or CI gate.
    dependency in §3 permanently, independent of where `pytest` is invoked
    from.
 
-### Phase 2 — Fix the concrete bugs found (§2)
+### Phase 2 — Fix the concrete bugs found (§2) ✅ Done
 1. Fix `LocalPDBClient.check_hash` (`hash` → `ph`).
 2. Fix the SQL trailing-`)` bugs and missing `return results` in
    `db/store.py`/`db/scanner.py`; switch all queries to parameterized
@@ -291,7 +347,7 @@ config wiring it into a required threshold or CI gate.
    actually thread a configurable DB path through `db/store.py` if per-store
    DB paths are wanted.
 
-### Phase 3 — Finish partially-implemented features
+### Phase 3 — Finish partially-implemented features ✅ Done (UI intentionally excluded, see §0)
 1. **HEIC EXIF writing** (`update_heic`): implement using `pillow-heif`'s
    metadata APIs, mirroring what `exif_tags.update_exif` does for JPEG.
 2. **RAW conversion pipeline**: decide whether `exiftool` remains an external
@@ -318,7 +374,7 @@ config wiring it into a required threshold or CI gate.
    "Load existing scan" against `ScanDB`, add a progress/cancel control, and
    move `wxPython` into a proper installable extra.
 
-### Phase 4 — Tests
+### Phase 4 — Tests ✅ Done (40 passed / 2 skipped / 2 deselected, 67% coverage)
 1. Fix test fixtures/config as in Phase 1.3, then:
    - Add regression tests for every bug in §2 (SQL bugs, `check_hash` bug,
      filename/foldering scheme, upload-failure error surfacing).
@@ -341,7 +397,7 @@ config wiring it into a required threshold or CI gate.
    `--cov-fail-under=` in `pyproject.toml`) once the above lands, so coverage
    can only go up from here.
 
-### Phase 5 — Pre-commit hooks & CI
+### Phase 5 — Pre-commit hooks & CI ✅ Done
 1. Add `.pre-commit-config.yaml`:
    - `ruff` (lint + format) and `ruff-format` hooks.
    - Standard hygiene hooks (`trailing-whitespace`, `end-of-file-fixer`,
@@ -355,7 +411,7 @@ config wiring it into a required threshold or CI gate.
    `pre-commit run --all-files`, `pytest` (excluding the `gui` marker), and
    uploading coverage.
 
-### Phase 6 — Documentation
+### Phase 6 — Documentation ✅ Done (this pass)
 1. Add a top-level `README.md` (currently entirely missing) covering: what
    the project does, quick start (`uv sync`, running `pdbscanner.py`, running
    the Flask API locally, running via Docker), configuration
@@ -384,3 +440,30 @@ config wiring it into a required threshold or CI gate.
   a separate, often-missing EXIF tag). Plan should fall back gracefully
   (e.g. `.000` or an index-based disambiguator) when sub-second EXIF data is
   absent, rather than assuming it's always available.
+
+### Resolutions (implemented)
+
+- **Zero-padded `YYYY/MM` folders**: implemented as proposed —
+  `Photo.db_path()` now zero-pads the month, e.g. `2024/03/`.
+- **Filename separators**: rather than choosing between colons and dashes
+  for a literal `day-of-week-HH:MM:SS.mmmm_` string, the implemented scheme
+  drops separators entirely and uses a single fixed-width numeric prefix:
+  `DDHHMMSSmmm_<hash-fragment>.<ext>` (day-of-month, hour, minute, second,
+  millisecond, each fixed-width, followed by a short disambiguator derived
+  from the photo's hash, then the original extension). This sidesteps the
+  colon/dash portability question entirely, sorts correctly both
+  lexicographically and chronologically within a given year/month folder
+  (which is what actually matters for "browse by capture date" use), and
+  keeps day-of-week out of the filename — day-of-week is derivable from the
+  date for anyone who wants it (e.g. via the EXIF capture date already
+  stored on the `Photo` record) and isn't needed for sorting or uniqueness,
+  so encoding it in the filename would only add bytes without adding
+  information.
+- **Millisecond fallback**: when `SubSecTimeOriginal` is absent, the
+  millisecond component falls back to `000` rather than raising — this is
+  covered by `test/test_naming.py`.
+- **Disambiguator for same-millisecond collisions** (e.g. burst mode): a
+  short fragment (last 4 characters) of the photo's UUID is appended, rather
+  than a monotonic counter, so the scheme stays deterministic and
+  collision-free without requiring shared mutable state across concurrent
+  scanner threads.
