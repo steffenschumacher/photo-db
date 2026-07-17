@@ -9,7 +9,7 @@ RUN apt-get update && \
     rm -f /etc/nginx/sites-enabled/default
 
 
-ENV PYTHONPATH="${PYTHONPATH}:/project/"
+ENV PYTHONPATH="/project/"
 # ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
 # where the images and the database is stored - create volume for this
@@ -21,25 +21,26 @@ ENV PH_STORE_URL=/photodb
 ENV PH_HASH_SIZE=70
 EXPOSE 80/tcp
 
-RUN set -eux; \
-    \
-    savedAptMark="$(apt-mark showmanual)"; \
-    apt-get update -y;  \
-    apt-get install -qy gcc; \
-    apt-mark auto '.*' > /dev/null; \
-	  [ -z "$savedAptMark" ] || apt-mark manual $savedAptMark > /dev/null; \
-	  apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
-   	rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 # Set default workdir
 WORKDIR /project
 
-# Install python dependencies (server/API side only - no ui/raw extras)
+# Install python dependencies (server/API side only - no ui/raw extras).
+# gcc is only needed transiently to build the uwsgi wheel (it has no
+# manylinux wheel for this base image) - install it, build, then purge it
+# in the same layer so it never ends up in the final image size.
 COPY pyproject.toml uv.lock ./
-RUN uv sync --extra api --no-dev --no-install-project && \
-    uv pip install uwsgi
+RUN set -eux; \
+    savedAptMark="$(apt-mark showmanual)"; \
+    apt-get update -y; \
+    apt-get install -qy gcc; \
+    uv sync --extra api --no-dev --no-install-project; \
+    uv pip install uwsgi; \
+    apt-mark auto '.*' > /dev/null; \
+    [ -z "$savedAptMark" ] || apt-mark manual $savedAptMark > /dev/null; \
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ENV PATH="/project/.venv/bin:${PATH}"
 
@@ -48,8 +49,11 @@ COPY server-conf/nginx.conf /etc/nginx/
 COPY server-conf/flask-site-nginx.conf /etc/nginx/conf.d/
 COPY server-conf/uwsgi.ini /etc/uwsgi/
 COPY server-conf/supervisord.conf /etc/supervisor/
+COPY server-conf/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # Copy the project code to the container
 COPY manage.py .
+COPY pdbscanner.py .
 COPY photo_db photo_db
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

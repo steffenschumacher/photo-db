@@ -78,6 +78,14 @@ Requires the `ui` extra (`uv sync --extra ui`); launch with:
 uv run python photodb-ui.py
 ```
 
+Prebuilt, standalone Windows and macOS desktop app builds (no Python
+install required) are attached to each
+[GitHub release](https://github.com/steffenschumacher/photo-db/releases)
+(see `.github/workflows/release.yml`) - download and unzip the one for your
+OS. These are unsigned, so Windows SmartScreen and macOS Gatekeeper will
+warn on first launch ("unknown publisher"/"unidentified developer") - on
+macOS, right-click the app and choose Open the first time to bypass this.
+
 wxPython was the original (abandoned) choice for this UI; PySide6 was
 chosen for the rewrite for its LGPL licensing and `QListView`/
 `QAbstractListModel`/`QThreadPool` support, which is the idiomatic Qt
@@ -121,6 +129,38 @@ credentials for a live server, treat them as compromised and rotate them —
 the hardcoded credential fallbacks that used to live in `Config` have been
 removed, but rotating the credentials themselves is outside what this
 tooling can verify or action.
+
+## Running the backend with Docker
+
+A pre-built image (API server + `pdbscanner.py` CLI) is published to
+`ghcr.io/steffenschumacher/photo-db` on every tagged release (see
+`.github/workflows/release.yml`).
+
+```bash
+# Serve the API (default command):
+docker run -d --name photodb \
+  -p 5010:80 \
+  -e PH_STORE_USER=myuser -e PH_STORE_PASS=mypassword \
+  -v ./photo_store:/photodb \
+  ghcr.io/steffenschumacher/photo-db:latest
+
+# One-off scan/import against a store, local or remote, without starting
+# the web server at all - handy for a cron job or a manual backfill:
+docker run --rm \
+  -v /path/to/import:/import -v ./photo_store:/photodb \
+  ghcr.io/steffenschumacher/photo-db:latest scan -s /import -l /photodb
+```
+
+Or via `docker-compose.yml`, which also wires up a `cloudflared` sidecar so
+the API can be exposed publicly through a Cloudflare Tunnel without opening
+any inbound ports on the host:
+
+```bash
+cp .env.docker.example .env   # fill in PH_STORE_USER/PASS and
+                                # CLOUDFLARE_TUNNEL_TOKEN (see comments in
+                                # that file for how to get a tunnel token)
+docker compose up -d
+```
 
 ## Running tests
 

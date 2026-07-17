@@ -1,11 +1,33 @@
-version: '3'
 services:
   photodb:
-    image: net-docker-reg.vestas.net/photodb:0.0.1
+    image: ghcr.io/steffenschumacher/photo-db:latest
     build: .
+    restart: unless-stopped
+    # Only needed for direct/local access to the API without going through
+    # the Cloudflare tunnel below (e.g. LAN access, or debugging) - remove
+    # this if the tunnel should be the only ingress path.
     ports:
-     - "5010:80"
+      - "5010:80"
     environment:
       - PH_STORE_URL=/photodb
+      - PH_STORE_USER=${PH_STORE_USER:?set PH_STORE_USER in .env}
+      - PH_STORE_PASS=${PH_STORE_PASS:?set PH_STORE_PASS in .env}
+      - PH_HASH_SIZE=${PH_HASH_SIZE:-70}
     volumes:
-     - ./photo_store:/photodb
+      - ./photo_store:/photodb
+
+  # Cloudflare Tunnel sidecar - exposes the photodb service to the internet
+  # through Cloudflare's edge without opening any inbound ports on this
+  # host. Create the tunnel and its public hostname routing (pointing at
+  # http://photodb:80, the service name/port on this compose network) in
+  # the Cloudflare Zero Trust dashboard (Networks > Tunnels > Create a
+  # tunnel > Docker), then copy the generated token into
+  # CLOUDFLARE_TUNNEL_TOKEN below (e.g. via a .env file - see .env.example).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on:
+      - photodb

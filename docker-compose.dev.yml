@@ -1,8 +1,15 @@
-version: '3'
 services:
   photodb:
-    build: photo_db
+    build: .
     ports:
-     - "5010:80"
+      - "5010:80"
+    environment:
+      - PH_STORE_URL=/photodb
+      - PH_STORE_USER=${PH_STORE_USER:-devuser}
+      - PH_STORE_PASS=${PH_STORE_PASS:-devpass}
     volumes:
-     - .:/project
+      - ./photo_store:/photodb
+      # Bind-mount the source tree over the image's copy so code changes
+      # are picked up without rebuilding - restart the container to pick
+      # them up (uwsgi doesn't auto-reload).
+      - .:/project

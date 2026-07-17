@@ -45,6 +45,11 @@ dev = [
     "ruff>=0.7",
     "pre-commit>=4.0",
 ]
+# Only needed to build standalone desktop-UI binaries in CI (see
+# .github/workflows/release.yml) - not a runtime dependency.
+build = [
+    "pyinstaller>=6.10",
+]
 
 [tool.uv]
 package = false

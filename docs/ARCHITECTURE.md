@@ -139,11 +139,29 @@ so that clearly-duplicate or clearly-inferior images never have to be uploaded.
 ## Deployment shape
 
 `Dockerfile` builds an image running `nginx` + `uwsgi` (via `supervisord`) to
-serve the Flask API (`manage.py` / `webapi.py`) — i.e. the intended production
-topology is: photo library lives on a server machine, exposed over HTTPS with
-basic auth, and one or more client machines run `pdbscanner.py` against local
-folders (phone backups, camera SD card dumps, etc.), each doing local dedup
-work before contacting the server.
+serve the Flask API (`manage.py` / `webapi.py`), with `pdbscanner.py` also
+baked into the same image so a one-off scan/import can be run via
+`docker run <image> scan -s ... -l ...` without starting the web server at
+all (see `server-conf/docker-entrypoint.sh`, which dispatches between the
+two based on the first argument) — i.e. the intended production topology is:
+photo library lives on a server machine, exposed over HTTPS with basic auth,
+and one or more client machines run `pdbscanner.py` (or the desktop UI)
+against local folders (phone backups, camera SD card dumps, etc.), each
+doing local dedup work before contacting the server.
+
+`docker-compose.yml` runs that backend alongside a `cloudflared` sidecar
+(Cloudflare Tunnel), so the API can be exposed publicly without opening any
+inbound ports on the host — the tunnel's ingress routing (which public
+hostname maps to `http://photodb:80`) is configured in the Cloudflare Zero
+Trust dashboard, not in this repo, only the tunnel token is (see
+`.env.docker.example`).
+
+`.github/workflows/release.yml` builds and publishes, on every `vX.Y.Z` tag
+push: a multi-arch (amd64/arm64) build of that same Docker image to
+`ghcr.io/steffenschumacher/photo-db`, and standalone PyInstaller
+(`--onedir`) builds of the desktop UI for Windows and macOS, attached to a
+GitHub Release. `.github/workflows/ci.yml` runs the test suite/lint on every
+push/PR to `master`.
 
 See `docs/PROJECT_STATUS_AND_PLAN.md` for a full audit of how complete each of
 these pieces is, concrete bugs found, and a prioritized plan to finish the

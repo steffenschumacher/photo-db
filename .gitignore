@@ -29,3 +29,8 @@ https:/
 photodb-import.tgz
 photo_store/
 *.photo.db
+
+# --- PyInstaller build output (see .github/workflows/release.yml) ---
+build/
+dist/
+*.spec
