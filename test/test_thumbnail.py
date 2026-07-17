@@ -63,6 +63,39 @@ def test_local_store_backfills_missing_thumbnail(local_store_client, clean_store
     assert os.path.exists(thumb_path)
 
 
+def test_write_thumbnail_tolerates_concurrent_same_month_uploads(local_store_client, clean_store):
+    """Regression test for docs/issues.md #1: the scanner uploads photos on
+    a thread pool, so multiple threads can race to create the same
+    not-yet-existing year/month thumbnail directory. An exists()-then-
+    makedirs() check is a TOCTOU race - the loser hits FileExistsError even
+    though the directory now exists exactly as intended. _write_thumbnail()
+    (and abs_folder(), same pattern) must tolerate this instead of
+    crashing."""
+    import os
+    from concurrent.futures import ThreadPoolExecutor
+    from datetime import datetime
+
+    from photo_db.photo.photo import LocalPhoto
+
+    store = local_store_client.store
+    data = _sample_bytes()
+    same_month = datetime(2013, 2, 1)
+
+    def _write(_):
+        ph = LocalPhoto.from_file(str(STATIC_DIR / "08-190641-4631.jpeg"), config=store.config)
+        ph.date = same_month
+        store._write_thumbnail(ph, data)
+        return ph
+
+    # Force every worker to hit the same not-yet-existing directory at
+    # once - a plain sequential loop would never reproduce the race.
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(_write, range(8)))
+
+    for ph in results:
+        assert os.path.exists(store.thumb_path(ph))
+
+
 def test_local_store_rotate_regenerates_thumbnail_with_new_orientation(
     local_store_client, clean_store
 ):

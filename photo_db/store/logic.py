@@ -22,8 +22,7 @@ class LocalStore:
 
     def __init__(self, config: Config = default_config):
         self.config = config
-        if not exists(config.STORE_URL):
-            makedirs(config.STORE_URL)
+        makedirs(config.STORE_URL, exist_ok=True)
         self.db = StoreDB(config)
 
     def check_hash(self, ph: Photo) -> bool:
@@ -160,8 +159,14 @@ class LocalStore:
     def _write_thumbnail(self, ph: Photo, photo: bytes) -> None:
         path = self.thumb_path(ph)
         thumb_dir = dirname(path)
-        if not exists(thumb_dir):
-            makedirs(thumb_dir)
+        # exist_ok=True (rather than an exists()-then-makedirs() check)
+        # avoids a TOCTOU race: the scanner runs many process_image() calls
+        # concurrently on a thread pool, so two threads uploading photos
+        # from the same year/month can both observe the directory as
+        # missing and race to create it - the loser would otherwise hit a
+        # FileExistsError even though the directory now exists exactly as
+        # intended.
+        makedirs(thumb_dir, exist_ok=True)
         with open(path, "wb") as thumb_file:
             thumb_file.write(generate_thumbnail(photo, rotation=ph.rotation))
 
@@ -179,8 +184,10 @@ class LocalStore:
         db_path_parts = db_path.split(sep)
         filename = db_path_parts.pop()
         db_dir = join(self.config.STORE_URL, *db_path_parts)
-        if not exists(db_dir):
-            makedirs(db_dir)
+        # Same TOCTOU race as _write_thumbnail() above - use exist_ok=True
+        # rather than an exists() check, since multiple scanner threads can
+        # be uploading into the same year/month folder concurrently.
+        makedirs(db_dir, exist_ok=True)
         return join(db_dir, filename)
 
 

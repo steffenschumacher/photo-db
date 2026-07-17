@@ -13,7 +13,7 @@ fetched/cached separately (see ``photo_db.ui``), keyed by uuid.
 
 from datetime import UTC, datetime
 from os import makedirs
-from os.path import dirname, exists
+from os.path import dirname
 from sqlite3 import Connection, connect
 from threading import Lock
 
@@ -58,8 +58,8 @@ class LeanCache:
     def __init__(self, config: Config = default_config):
         self.config = config
         db_dir = dirname(config.LEAN_CACHE_PATH)
-        if db_dir and not exists(db_dir):
-            makedirs(db_dir)
+        if db_dir:
+            makedirs(db_dir, exist_ok=True)
         # Scanner uses this cache from multiple ThreadPoolExecutor worker
         # threads (as well as the main thread), so allow cross-thread use
         # and serialize actual access with a lock - sqlite3 connections
