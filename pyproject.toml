@@ -1,6 +1,6 @@
 [project]
 name = "photo-db"
-version = "0.1.5"
+version = "0.2.0"
 description = "Client/server photo library consolidator with client-side duplicate detection"
 readme = "README.md"
 requires-python = ">=3.13"
