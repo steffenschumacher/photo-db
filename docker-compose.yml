@@ -1,0 +1,12 @@
+version: '3'
+services:
+  photodb:
+    image: net-docker-reg.vestas.net/photodb:0.0.1
+    build: .
+    ports:
+     - "5010:80"
+    environment:
+      - PH_STORE_URL=/photodb
+    volumes:
+     - ./photo_store:/photodb
+

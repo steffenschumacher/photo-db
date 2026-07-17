@@ -1,0 +1,8 @@
+version: '3'
+services:
+  photodb:
+    build: photo_db
+    ports:
+     - "5010:80"
+    volumes:
+     - .:/project

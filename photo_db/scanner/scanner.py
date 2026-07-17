@@ -1,0 +1,203 @@
+from os.path import join, isdir, isfile, sep
+from os import listdir
+from datetime import datetime
+from time import time
+from threading import Lock
+from concurrent.futures import ThreadPoolExecutor, Future
+from collections import deque
+from uuid import uuid4
+from traceback import print_exc
+from re import compile, IGNORECASE
+
+from photo_db.photo import LocalPhoto, Photo
+from photo_db.db.scanner import ScanDB
+from photo_db.constants import IGNORABLE_EXTS
+from photo_db.client import *
+from photo_db.api import SimilarException, DuplicateException
+
+
+_ignore_pat = compile(r".*(\.AppleDouble).*", IGNORECASE)
+_consider_pat = compile(r"\S+\.(jpg|jepg|heic)", IGNORECASE)
+
+
+class Scanner:
+    client: AbstractPDBClient = None
+    pool: ThreadPoolExecutor
+
+    def __init__(self, client: AbstractPDBClient = None):
+        self.client: AbstractPDBClient = client or init_client()
+        self.pool = ThreadPoolExecutor(4)
+        self.futures = deque()
+        self.processed = 0
+        self.detected = 0
+        self.start = None
+        self._chs = self.pool.submit(client.hashes)
+        self._chs_lock = Lock()
+        self.scan_hashes: dict[str, LocalPhoto] = {}
+        self.sh_lock = Lock()
+        self.ch_lock = Lock()
+        self.db = ScanDB()
+
+    @property
+    def central_hashes(self) -> dict[str, str]:
+        if isinstance(self._chs, Future):
+            with self._chs_lock:
+                if isinstance(self._chs, Future):
+                    self._chs = self._chs.result()
+        if isinstance(self._chs, dict):
+            return self._chs
+        else:
+            raise ValueError(f"Loading of central hashes failed: {self._chs}")
+
+    def scan_dir(self, path: str):
+        if self.start is None:
+            self.start = time()
+        for file in listdir(path):
+            full = join(path, file)
+            if isdir(full):
+                self.scan_dir(full)
+            elif self.is_possible_image(full):
+                self.detected += 1
+                fut = self.pool.submit(self.process_image, path, file)
+                self.futures.appendleft(fut)
+
+    def processed_photos(self) -> list[LocalPhoto]:
+        return self.db.search()
+
+    def uploading_complete(self, blocking=False, verbose=True, hz=100) -> tuple[bool, list[LocalPhoto]]:
+        tick = None
+        photos = []
+        while True:
+            if not self.futures:
+                return True, photos
+            fut: Future = self.futures.pop()
+            try:
+                ph: LocalPhoto = fut.result(timeout=None if blocking else 0.1)
+                print(f"Finished processing {ph}")
+                self.db.upsert_photo(ph)
+                photos.append(ph)
+                self.processed += 1
+                if not tick:
+                    tick = hz
+                    if verbose:
+                        msg = f"Processed {self.processed}/{self.detected} photos - remaining: {len(self.futures)}"
+                        print(msg)
+                tick -= 1
+            except TimeoutError:
+                self.futures.insert(0, fut)
+                return False, photos
+            except Exception as e:
+                print(f"Received unhandled exception: {e}")
+                print_exc()
+                return False, photos
+
+    def process_image(self, path: str, file: str, pre_check_hash=True):
+        full = join(path, file)
+        try:
+            ph = LocalPhoto.from_file(full)
+            if not ph.camera or not ph.latitude or not ph.longitude or not ph.date:
+                ph.latitude = ph.latitude or 0
+                ph.longitude = ph.longitude or 0
+                ph.altitude = ph.altitude or 0
+                ph.camera = ph.camera or "N/A"
+                ph.date = ph.date or datetime.fromtimestamp(0.0)
+                reasons = []
+                if not ph.camera:
+                    reasons.append("camera")
+                if not ph.latitude:
+                    reasons.append("GPS")
+                if not ph.date:
+                    reasons.append("date")
+                ph.reject_reason = f"Incomplete EXIF data ({'+'.join(reasons)})"
+                ph.status = "exif"
+                return ph
+        except ValueError as ve:
+            print(f"{file} is not a valid photo - skipping: {ve}")
+            dummy_args = {
+                "path": full,
+                "camera": "Unknown",
+                "date": datetime.now(),
+                "width": 0,
+                "height": 0,
+                "hash": str(uuid4()),
+                "extension": full.split(sep)[-1],
+                "reject_reason": ve.args[0].split(": ")[-1],
+                "status": "ignored",
+            }
+            return LocalPhoto(**dummy_args)
+        if self.check_with_processed_photos(ph):
+            # attempts upload if likely import worthy
+            self.check_with_central_photos(ph)
+        return ph
+
+    def check_with_processed_photos(self, ph: LocalPhoto) -> bool:
+        with self.sh_lock:
+            if processed := self.scan_hashes.get(ph.hash, None):
+                ph.duplicate_src = "local"
+                ph.duplicate_uuid = processed.uuid
+                ph.reject_reason = "identical to already processed photo"
+                ph.status = "duplicate"
+                return False
+            for scan_hash, other in self.scan_hashes.items():
+                if ph.similar_to_hash(scan_hash):
+                    if other.preferable_to(ph):
+                        ph.duplicate_src = "local"
+                        ph.duplicate_uuid = other.uuid
+                        ph.reject_reason = f"too similar to processed photo"
+                        ph.status = "similar"
+                        return False
+                    else:
+                        ph.duplicate_src = "local"
+                        ph.duplicate_uuid = other.uuid
+                        ph.reject_reason = f"similar to processed photo, but preferable"
+            # we passed all the tests - we will try to upload this now...
+            self.scan_hashes[ph.hash] = ph
+            return True
+
+    def check_with_central_photos(self, ph: LocalPhoto) -> bool:
+        with self.ch_lock:
+            if existing := self.central_hashes.get(ph.hash, None):
+                ph.duplicate_src = "central"
+                ph.duplicate_uuid = existing
+                ph.reject_reason = "identical to imported photo"
+                ph.status = "duplicate"
+                return ph
+            for central_hash, uuid in self.central_hashes.items():
+                if ph.similar_to_hash(central_hash):
+                    other: Photo = self.client.get_meta(uuid)
+                    if other.preferable_to(ph):
+                        ph.duplicate_src = "central"
+                        ph.duplicate_uuid = uuid
+                        ph.reject_reason = f"too similar to imported photo"
+                        ph.status = "similar"
+                        return ph
+                    else:
+                        ph.duplicate_src = "central"
+                        ph.duplicate_uuid = uuid
+                        ph.reject_reason = f"similar to imported photo, but preferable"
+
+        # we passed all the tests - we will try to upload this now...
+        try:
+            with open(ph.local_path, "rb") as pic:
+                ph.uuid = self.client.upload(pic.read())
+                ph.status = "uploaded"
+                with self.ch_lock:
+                    self.central_hashes[ph.hash] = ph.uuid
+        except (DuplicateException, SimilarException) as de:
+            ph.duplicate_src = "central"
+            ph.duplicate_uuid = de.uuid
+            ph.reject_reason = de.description
+            ph.status = "rejected"
+        return True
+
+    def is_possible_image(self, abs_file: str) -> bool:
+        if not isfile(abs_file):
+            return False
+        lower = abs_file.lower()
+        if _ignore_pat.search(lower):
+            return False
+        for ext in IGNORABLE_EXTS:
+            if lower.endswith(f".{ext}"):
+                return False
+
+        return bool(_consider_pat.search(lower))

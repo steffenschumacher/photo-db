@@ -1,0 +1,31 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.coverage
+.coverage.*
+coverage_html_report/
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Virtual environments ---
+venv/
+venv311/
+.venv/
+
+# --- Secrets / local config ---
+.env
+
+# --- Editors / OS ---
+.idea/
+.vscode/
+.DS_Store
+
+# --- Project-specific stray artifacts ---
+https:/
+photodb-import.tgz
+photo_store/
+*.photo.db

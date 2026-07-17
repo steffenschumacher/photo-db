@@ -1,0 +1,12 @@
+sqlite-utils==3.32.1
+sqlite-fts4==1.0.3
+python-dotenv==1.0.0
+pydantic==1.10.8
+pillow-heif==0.11.1
+Pillow==9.5.0
+ImageHash==4.3.1
+Flask-HTTPAuth==4.8.0
+environs==9.5.0
+ExifRead==2.3.2
+Flask==2.3.2
+Werkzeug==2.3.6

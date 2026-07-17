@@ -1,0 +1,13 @@
+sqlite-utils==3.32.1
+python-dotenv==1.0.0
+pydantic==1.10.8
+pillow-heif==0.11.1
+Pillow==9.5.0
+ImageHash==4.3.1
+environs==9.5.0
+ExifRead==2.3.2
+requests==2.31.0
+geopy==2.3.0
+exif==1.6.0
+Werkzeug==2.3.6
+#wxPython==4.2.1

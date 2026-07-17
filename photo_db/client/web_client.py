@@ -1,0 +1,79 @@
+from io import BytesIO
+from requests import post, get, Response, exceptions
+from ..config import Config
+from .abstract_client import AbstractPDBClient
+from ..photo import Photo
+from ..api import DuplicateException, SimilarException
+
+
+class WebClient:
+    @classmethod
+    def post(cls, *args, **kwargs) -> Response:
+        return post(*args, **kwargs)
+
+    @classmethod
+    def get(cls, *args, **kwargs) -> Response:
+        return get(*args, **kwargs)
+
+
+class WebPDBClient(AbstractPDBClient):
+    def __init__(self, url=None, user=None, pwd=None):
+        self.url = url or Config.STORE_URL
+        self.http_kwargs = {
+            "auth": (user or Config.STORE_USER, pwd or Config.STORE_PASS),
+            "verify": Config.SSL_VERIFY,
+        }
+        if not Config.SSL_VERIFY:
+            import urllib3
+
+            urllib3.disable_warnings()
+
+    @property
+    def client(self) -> WebClient:
+        return WebClient
+
+    def check_hash(self, ph: Photo) -> bool:
+        url = f"{self.url}/pre_check"
+        client = self.client
+        r = client.post(url, json=ph.json(), **self.http_kwargs)
+        self.process_response(r)
+        return True
+
+    def upload(self, image: bytes) -> str:
+        url = f"{self.url}/upload"
+        r = self.client.post(url, data=BytesIO(image), **self.http_kwargs)
+        self.process_response(r)
+        return r.text
+
+    def get(self, uuid: str) -> bytes:
+        url = f"{self.url}/image/{uuid}"
+        r = self.client.get(url, **self.http_kwargs)
+        self.process_response(r)
+        return r.content
+
+    def get_meta(self, uuid: str) -> Photo:
+        url = f"{self.url}/meta/{uuid}"
+        r = self.client.get(url, **self.http_kwargs)
+        self.process_response(r)
+        kwargs = r.json() if callable(r.json) else r.json
+        return Photo(**kwargs)
+
+    def hashes(self) -> dict[str, str]:
+        url = f"{self.url}/hashes"
+        r = self.client.get(url, **self.http_kwargs)
+        self.process_response(r)
+        return r.json()
+
+    def process_response(self, r: Response):
+        if r.status_code == 409:
+            if json := r.json:
+                if pdb_code := json.get("pdb_code"):
+                    uuid = json["uuid"]
+                    msg = json["msg"]
+                    if pdb_code == 1001:
+                        raise DuplicateException(uuid, msg)
+                    elif pdb_code == 1002:
+                        raise SimilarException(uuid, msg)
+                raise ValueError(f"Invalid exception json: {json}")
+        elif hasattr(r, "raise_for_status"):
+            r.raise_for_status()

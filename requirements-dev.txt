@@ -1,0 +1,4 @@
+black
+requests-mock-flask
+pytest
+pytest-coverage
