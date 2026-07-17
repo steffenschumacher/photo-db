@@ -113,10 +113,25 @@ def add_routes(app: Flask, config: Config = default_config):
         candidate photo is already in the library (and browse/preview via
         /thumb/<uuid>) without a network round trip per file."""
         since_param = request.args.get("since")
-        since = datetime.fromtimestamp(float(since_param), tz=UTC) if since_param else None
+        after_uuid = None
+        if since_param and ":" in since_param:
+            timestamp, after_uuid = since_param.split(":", 1)
+            since = datetime.fromtimestamp(float(timestamp), tz=UTC)
+        else:
+            since = datetime.fromtimestamp(float(since_param), tz=UTC) if since_param else None
         limit = int(request.args.get("limit", 5000))
-        photos = store.since(since, limit)
+        photos = store.since(since, limit, after_uuid)
         return {
             "photos": [ph.lean_dict() for ph in photos],
-            "next_since": photos[-1].scanned.timestamp() if photos else since_param,
+            "next_since": (
+                f"{int(photos[-1].scanned.timestamp())}:{photos[-1].uuid}"
+                if photos
+                else since_param
+            ),
         }
+
+    @app.route("/web-config", methods=["GET"])
+    @auth.login_required
+    def web_config():
+        """Publicly safe algorithm settings needed by browser clients."""
+        return {"hash_size": config.HASH_SIZE, "similarity": config.SIMILARITY}

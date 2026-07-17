@@ -115,6 +115,28 @@ uv run python pdbscanner.py -s /path/to/photos/to/import \
 uv run flask --app photo_db.app:create_app run
 ```
 
+## Browser companion
+
+The Angular companion browses the remote library and scans a local folder
+without uploading image bytes until a file has passed local EXIF and
+perceptual-duplicate checks. Folder scanning requires Chrome or Edge; browsing
+works in other modern browsers. Credentials use HTTP Basic Auth and are kept
+only in memory and `sessionStorage`.
+
+For frontend development, install a current Node 22 LTS release, then run:
+
+```bash
+cd web-ui
+npm ci
+npm start             # development server
+npm test -- --watch=false
+npm run e2e           # real Chromium fixture + upload acceptance test
+npm run build         # production bundle in web-ui/dist/web-ui/browser
+```
+
+Production Docker builds compile the bundle and serve it from the Flask app at
+`/`. API routes remain same-origin, so no CORS configuration is required.
+
 Configuration is via environment variables (see `.env.example` for the full
 list, `photo_db/config.py` for defaults and precedence): `PH_STORE_URL`,
 `PH_STORE_USER`, `PH_STORE_PASS`, `PH_HASH_SIZE`, `PH_SIMILARITY`, `PH_UID`,

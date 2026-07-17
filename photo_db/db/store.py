@@ -118,7 +118,12 @@ class StoreDB:
             if c:
                 c.close()
 
-    def since(self, scanned_after: datetime | None = None, limit: int = 5000) -> list[Photo]:
+    def since(
+        self,
+        scanned_after: datetime | None = None,
+        limit: int = 5000,
+        after_uuid: str | None = None,
+    ) -> list[Photo]:
         """Return photos with ``scanned`` after ``scanned_after`` (or all
         photos if ``None``), ordered by ``scanned`` ascending, for
         incremental "lean" sync to thick clients: cheap metadata only, no
@@ -129,9 +134,14 @@ class StoreDB:
         params = []
         where = ""
         if scanned_after is not None:
-            where = " WHERE scanned > ?"
-            params.append(int(scanned_after.timestamp()))
-        qry = f"SELECT {','.join(fields)} FROM photo{where} ORDER BY scanned ASC LIMIT ?"
+            timestamp = int(scanned_after.timestamp())
+            if after_uuid is not None:
+                where = " WHERE scanned > ? OR (scanned = ? AND uuid > ?)"
+                params.extend((timestamp, timestamp, after_uuid))
+            else:
+                where = " WHERE scanned > ?"
+                params.append(timestamp)
+        qry = f"SELECT {','.join(fields)} FROM photo{where} ORDER BY scanned ASC, uuid ASC LIMIT ?"
         params.append(limit)
 
         c = self._cnx()

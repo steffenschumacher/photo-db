@@ -72,6 +72,18 @@ def test_scan(local_store_client, clean_store, test_config):
     assert len(uploaded) == 3
 
 
+def test_incomplete_exif_reports_the_actual_missing_fields(
+    local_store_client, clean_store, test_config, exif_incomplete_photo
+):
+    sc = Scanner(local_store_client, config=test_config, lean_cache=_fresh_lean_cache())
+    path, filename = exif_incomplete_photo.rsplit("/", 1)
+
+    photo = sc.process_image(path, filename)
+
+    assert photo.status == "exif"
+    assert photo.reject_reason == "Incomplete EXIF data (GPS)"
+
+
 def test_scan_from_a_different_thread_than_construction(
     local_store_client, clean_store, test_config
 ):

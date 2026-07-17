@@ -90,7 +90,7 @@ class WebPDBClient(AbstractPDBClient):
         self.process_response(r)
         return _response_json(r)
 
-    def sync_since(self, since: float | None = None, limit: int = 5000) -> dict:
+    def sync_since(self, since: float | str | None = None, limit: int = 5000) -> dict:
         query = f"limit={limit}"
         if since is not None:
             query += f"&since={since}"

@@ -1,5 +1,12 @@
 FROM python:3.13-slim-bookworm AS base
 
+FROM node:22.23.1-bookworm-slim AS web-build
+WORKDIR /web
+COPY web-ui/package.json web-ui/package-lock.json ./
+RUN npm ci
+COPY web-ui/ ./
+RUN npm run build
+
 FROM base AS install
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -55,5 +62,6 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 COPY manage.py .
 COPY pdbscanner.py .
 COPY photo_db photo_db
+COPY --from=web-build /web/dist/web-ui/browser photo_db/web/browser
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

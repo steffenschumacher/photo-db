@@ -33,4 +33,8 @@ photo_store/
 # --- PyInstaller build output (see .github/workflows/release.yml) ---
 build/
 dist/
+web-ui/node_modules/
+photo_db/web/
+web-ui/test-results/
+web-ui/playwright-report/
 *.spec

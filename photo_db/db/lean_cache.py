@@ -101,13 +101,13 @@ class LeanCache:
             self.cnx.executemany(stmt, values)
             self.cnx.commit()
 
-    def last_synced(self) -> float | None:
+    def last_synced(self) -> float | str | None:
         with self._lock:
             cur = self.cnx.execute("SELECT last_synced FROM sync_meta WHERE id = 0;")
             row = cur.fetchone()
             return row[0] if row else None
 
-    def set_last_synced(self, timestamp: float) -> None:
+    def set_last_synced(self, timestamp: float | str) -> None:
         with self._lock:
             self.cnx.execute(
                 "INSERT INTO sync_meta (id, last_synced) VALUES (0, ?) "

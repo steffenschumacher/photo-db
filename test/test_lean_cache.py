@@ -1,10 +1,12 @@
 """Tests for LeanCache and the /sync lean incremental-sync endpoint."""
 
 import tempfile
+from base64 import b64encode
 from datetime import UTC, datetime
 
 from photo_db.config import Config
 from photo_db.db.lean_cache import LeanCache
+from photo_db.photo import Photo
 
 from .conftest import STATIC_DIR
 
@@ -63,6 +65,31 @@ def test_lean_cache_sync_from_local_client(local_store_client, clean_store):
     cache = LeanCache(_lean_config())
     synced = cache.sync(local_store_client)
     assert synced == 2
+    assert cache.count() == 2
+
+
+def test_sync_pagination_does_not_skip_photos_with_the_same_scanned_second(
+    local_store_client, clean_store, test_config
+):
+    scanned = datetime(2025, 1, 1, tzinfo=UTC)
+    for index in range(2):
+        cells = bytes([index] * (test_config.HASH_SIZE**2))
+        local_store_client.store.db.insert_photo(
+            Photo(
+                uuid=f"same-second-{index}",
+                camera="Test Camera",
+                date=scanned,
+                width=10,
+                height=10,
+                hash=b64encode(cells).decode(),
+                extension="jpeg",
+                scanned=scanned,
+                config=test_config,
+            )
+        )
+
+    cache = LeanCache(_lean_config())
+    assert cache.sync(local_store_client, page_limit=1) == 2
     assert cache.count() == 2
     assert cache.last_synced() is not None
 

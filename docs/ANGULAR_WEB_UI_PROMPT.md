@@ -1,14 +1,14 @@
 # Prompt: Angular web companion for PhotoDB
 
-> **Status:** not started. This document is a self-contained implementation
-> prompt/spec for a future session (human or agent) to pick up — it is not
-> itself an implementation plan that's been executed. Nothing in
-> `photo_db/`, the repo's git history, or its other docs references an
-> Angular/JS/WASM frontend before this file; the only prior trace is a
-> throwaway one-line suggestion in `docs/PROJECT_STATUS_AND_PLAN.md`
-> ("a minimal web UI... much less effort than finishing wxPython"), which
-> was superseded by the PySide6 desktop thick client that actually got
-> built instead.
+> **Status:** implemented. The Angular application is in `web-ui/`, its
+> same-origin Flask integration is in `photo_db/app.py`, and operating and
+> acceptance-test notes are in `docs/WEB_UI.md`. This document remains the
+> feature specification and rationale.
+>
+> **Implementation override:** the original IndexedDB suggestion below was
+> superseded by the project owner's decision to keep lean metadata in memory
+> only. The web client performs a fresh paginated `/sync` on page load, manual
+> refresh, and immediately before every folder scan.
 
 ## Goal
 

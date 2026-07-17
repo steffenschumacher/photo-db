@@ -1,0 +1,7 @@
+{
+  "/web-config": { "target": "http://127.0.0.1:5000", "secure": false },
+  "/sync": { "target": "http://127.0.0.1:5000", "secure": false },
+  "/thumb": { "target": "http://127.0.0.1:5000", "secure": false },
+  "/image": { "target": "http://127.0.0.1:5000", "secure": false },
+  "/upload": { "target": "http://127.0.0.1:5000", "secure": false }
+}

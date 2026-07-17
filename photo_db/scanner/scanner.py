@@ -136,27 +136,34 @@ class Scanner:
                 ph = convert_raw(full, self.config)
             else:
                 ph = LocalPhoto.from_file(full, config=self.config)
-            if not ph.camera or not ph.latitude or not ph.longitude or not ph.date:
+            missing = []
+            if not ph.camera or ph.camera == "unknown camera":
+                missing.append("camera")
+            if ph.latitude is None or ph.longitude is None:
+                missing.append("GPS")
+            if not ph.date:
+                missing.append("date")
+            if missing:
                 ph.latitude = ph.latitude or 0
                 ph.longitude = ph.longitude or 0
                 ph.altitude = ph.altitude or 0
                 ph.camera = ph.camera or "N/A"
                 ph.date = ph.date or datetime.fromtimestamp(0.0)
-                reasons = []
-                if not ph.camera:
-                    reasons.append("camera")
-                if not ph.latitude:
-                    reasons.append("GPS")
-                if not ph.date:
-                    reasons.append("date")
-                ph.reject_reason = f"Incomplete EXIF data ({'+'.join(reasons)})"
+                ph.reject_reason = f"Incomplete EXIF data ({'+'.join(missing)})"
                 ph.status = "exif"
                 return ph
         except (ValueError, ImportError, ModuleNotFoundError) as ve:
             print(f"{file} is not a valid photo - skipping: {ve}")
             reason = ve.args[0].split(": ")[-1] if ve.args else str(ve)
+            missing = []
+            if "Unable to parse datetime" in str(ve):
+                missing.append("date")
+            if "Unable to parse GPS" in str(ve):
+                missing.append("GPS")
             if isinstance(ve, ImportError | ModuleNotFoundError):
                 reason = f"RAW conversion unavailable ({reason}) - install the 'raw' extra"
+            if missing:
+                reason = f"Incomplete EXIF data ({'+'.join(missing)})"
             dummy_args = {
                 "path": full,
                 "camera": "Unknown",
@@ -166,7 +173,7 @@ class Scanner:
                 "hash": str(uuid4()),
                 "extension": full.split(sep)[-1],
                 "reject_reason": reason,
-                "status": "ignored",
+                "status": "exif" if missing else "ignored",
             }
             return LocalPhoto(**dummy_args)
         if self.check_with_processed_photos(ph):

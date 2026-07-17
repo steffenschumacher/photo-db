@@ -26,5 +26,5 @@ class AbstractPDBClient:
     def hashes(self) -> dict[str, str]:
         raise NotImplementedError("")
 
-    def sync_since(self, since: float | None = None, limit: int = 5000) -> dict:
+    def sync_since(self, since: float | str | None = None, limit: int = 5000) -> dict:
         raise NotImplementedError("")

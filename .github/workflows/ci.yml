@@ -12,6 +12,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.1
+          cache: npm
+          cache-dependency-path: web-ui/package-lock.json
+
+      - name: Install and test web UI
+        working-directory: web-ui
+        run: npm ci && npm test -- --watch=false && npm run build
+
+      - name: Install Chromium for web acceptance tests
+        working-directory: web-ui
+        run: npx playwright install --with-deps chromium
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
@@ -30,6 +44,10 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --extra api --extra raw --dev
+
+      - name: Run browser acceptance tests
+        working-directory: web-ui
+        run: npm run e2e
 
       - name: Run pre-commit hooks
         run: uv run pre-commit run --all-files

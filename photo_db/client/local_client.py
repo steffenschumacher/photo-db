@@ -37,10 +37,17 @@ class LocalPDBClient(AbstractPDBClient):
     def hashes(self) -> dict[str, str]:
         return self.store.get_hashes()
 
-    def sync_since(self, since: float | None = None, limit: int = 5000) -> dict:
-        since_dt = datetime.fromtimestamp(since, tz=UTC) if since is not None else None
-        photos = self.store.since(since_dt, limit)
+    def sync_since(self, since: float | str | None = None, limit: int = 5000) -> dict:
+        after_uuid = None
+        if isinstance(since, str) and ":" in since:
+            timestamp, after_uuid = since.split(":", 1)
+            since_dt = datetime.fromtimestamp(float(timestamp), tz=UTC)
+        else:
+            since_dt = datetime.fromtimestamp(float(since), tz=UTC) if since is not None else None
+        photos = self.store.since(since_dt, limit, after_uuid)
         return {
             "photos": [ph.lean_dict() for ph in photos],
-            "next_since": photos[-1].scanned.timestamp() if photos else since,
+            "next_since": (
+                f"{int(photos[-1].scanned.timestamp())}:{photos[-1].uuid}" if photos else since
+            ),
         }

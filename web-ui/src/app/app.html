@@ -1,0 +1,147 @@
+@if (!authenticated()) {
+  <main class="login-shell">
+    <form class="login-card" (ngSubmit)="login()">
+      <p class="eyebrow">Private photo library</p>
+      <h1>PhotoDB</h1>
+      <p>Sign in to browse and scan without sending duplicate files.</p>
+      <label
+        >Username<input name="username" [(ngModel)]="username" autocomplete="username" required
+      /></label>
+      <label
+        >Password<input
+          name="password"
+          [(ngModel)]="password"
+          type="password"
+          autocomplete="current-password"
+          required
+      /></label>
+      @if (loginError) {
+        <p class="error">{{ loginError }}</p>
+      }
+      <button class="primary" [disabled]="busy()">{{ busy() ? 'Signing in…' : 'Sign in' }}</button>
+      <small>Credentials stay in this browser tab's session storage.</small>
+    </form>
+  </main>
+} @else {
+  <header>
+    <div>
+      <p class="eyebrow">Personal archive</p>
+      <h1>PhotoDB</h1>
+    </div>
+    <nav>
+      <button (click)="refresh()" [disabled]="busy()">Sync library</button>
+      <button class="primary" (click)="scan()" [disabled]="scanning() || !scanSupported">
+        {{ scanning() ? 'Scanning…' : 'Scan a folder' }}
+      </button>
+      @if (scanning()) {
+        <button (click)="cancelScan()">Cancel scan</button>
+      }
+      <button (click)="logout()">Sign out</button>
+    </nav>
+  </header>
+  <main class="content">
+    @if (!scanSupported) {
+      <aside class="notice">
+        Folder scanning needs Chrome or Edge. Library browsing works in this browser.
+      </aside>
+    }
+    <section class="toolbar">
+      <div>
+        <strong>{{ photos().length }}</strong> photos <span>{{ message() }}</span>
+      </div>
+      <label
+        >Period<select [ngModel]="month()" (ngModelChange)="setMonth($event)">
+          <option value="all">All dates</option>
+          @for (item of months(); track item) {
+            <option [value]="item">{{ item }}</option>
+          }
+        </select></label
+      >
+    </section>
+    @if (scanResults().length) {
+      <section class="scan-panel">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Local scan</p>
+            <h2>Review files</h2>
+            @if (scanning()) {
+              <small>{{ scanProgress().processed }} / {{ scanProgress().total }} processed</small>
+            }
+          </div>
+          <button
+            class="primary"
+            (click)="uploadSelected()"
+            [disabled]="!selectedCount() || busy()"
+          >
+            Upload {{ selectedCount() }} new
+          </button>
+        </div>
+        <div class="scan-list">
+          @for (row of scanResults(); track row.id) {
+            <div class="scan-row" [class]="row.status">
+              <input
+                type="checkbox"
+                [checked]="row.selected"
+                [disabled]="row.status !== 'new'"
+                (change)="toggle(row)"
+              />
+              <div>
+                <strong>{{ row.relativePath }}</strong
+                ><small>{{ row.detail }}</small>
+                @if (row.duplicateUuid && !row.duplicateUuid.startsWith('batch-')) {
+                  <button class="inline" (click)="previewDuplicate(row)">
+                    View existing photo
+                  </button>
+                }
+              </div>
+              <span>{{ row.status }}</span>
+            </div>
+          }
+        </div>
+      </section>
+    }
+    <section>
+      <div class="section-title">
+        <div>
+          <p class="eyebrow">Remote library</p>
+          <h2>{{ month() === 'all' ? 'All photographs' : month() }}</h2>
+        </div>
+      </div>
+      @if (!visiblePhotos().length) {
+        <div class="empty">No photographs loaded yet. Sync the library to begin.</div>
+      }
+      <div class="grid">
+        @for (photo of displayedPhotos(); track photo.uuid) {
+          <button class="photo" (click)="preview(photo)">
+            <app-auth-image [uuid]="photo.uuid" [alt]="photo.camera"></app-auth-image
+            ><span
+              ><strong>{{ photo.date * 1000 | date: 'mediumDate' }}</strong
+              ><small>{{ photo.camera }}</small></span
+            >
+          </button>
+        }
+      </div>
+      @if (displayedPhotos().length < visiblePhotos().length) {
+        <button class="load-more" (click)="showMore()">
+          Show more ({{ visiblePhotos().length - displayedPhotos().length }} remaining)
+        </button>
+      }
+    </section>
+  </main>
+  @if (previewPhoto(); as photo) {
+    <div class="modal" (click)="closePreview()">
+      <article (click)="$event.stopPropagation()">
+        <button class="close" (click)="closePreview()" aria-label="Close">×</button>
+        @if (previewUrl()) {
+          <img [src]="previewUrl()" [alt]="photo.camera" />
+        } @else {
+          <div class="preview-loading">Loading full image…</div>
+        }
+        <footer>
+          <strong>{{ photo.date * 1000 | date: 'medium' }}</strong
+          ><span>{{ photo.camera }} · {{ photo.width }}×{{ photo.height }}</span>
+        </footer>
+      </article>
+    </div>
+  }
+}

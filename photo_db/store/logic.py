@@ -141,8 +141,13 @@ class LocalStore:
     def get_hashes(self) -> dict[str, str]:
         return self.db.get_hashes()
 
-    def since(self, scanned_after: datetime | None = None, limit: int = 5000) -> list[Photo]:
-        return self.db.since(scanned_after, limit)
+    def since(
+        self,
+        scanned_after: datetime | None = None,
+        limit: int = 5000,
+        after_uuid: str | None = None,
+    ) -> list[Photo]:
+        return self.db.since(scanned_after, limit, after_uuid)
 
     def thumb_path(self, ph: Photo) -> str:
         """Thumbnails live in a folder tree parallel to the originals, keyed

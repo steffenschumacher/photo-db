@@ -39,6 +39,17 @@ def test_hashes_reflects_uploaded_photos(web_client, clean_store):
     assert uuid in hashes.values()
 
 
+def test_web_config_exposes_only_browser_algorithm_settings(app, test_config):
+    response = app.test_client().get(
+        "/web-config", auth=(test_config.STORE_USER, test_config.STORE_PASS)
+    )
+    assert response.status_code == 200
+    assert response.json == {
+        "hash_size": test_config.HASH_SIZE,
+        "similarity": test_config.SIMILARITY,
+    }
+
+
 def test_rotate_persists_and_reorients_fetched_image(web_client, clean_store):
     uuid = _upload_sample(web_client)
     assert web_client.get_meta(uuid).rotation == 0
