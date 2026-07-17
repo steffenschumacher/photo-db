@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from io import BytesIO
 from json import loads
 
@@ -52,6 +53,23 @@ def add_routes(app: Flask, config: Config = default_config):
             )
         raise NotFound(f"No image with uuid: {uuid}")
 
+    @app.route("/thumb/<uuid>", methods=["GET"])
+    @auth.login_required
+    def fetch_thumbnail(uuid: str) -> bytes:
+        if ph := store.get_photo(uuid):
+            data = store.get_thumbnail(ph)
+            response = send_file(
+                BytesIO(data),
+                download_name=f"{uuid}_thumb.jpg",
+                mimetype="image/jpeg",
+                as_attachment=False,
+            )
+            # The perceptual hash never changes for a given photo, so it
+            # makes a stable, cheap-to-compare ETag for client-side caching.
+            response.set_etag(ph.hash)
+            return response
+        raise NotFound(f"No image with uuid: {uuid}")
+
     @app.route("/meta/<uuid>", methods=["GET"])
     @auth.login_required
     def meta_image(uuid: str):
@@ -68,3 +86,19 @@ def add_routes(app: Flask, config: Config = default_config):
     @auth.login_required
     def hashes() -> dict[str, str]:
         return store.get_hashes()
+
+    @app.route("/sync", methods=["GET"])
+    @auth.login_required
+    def sync():
+        """Lean incremental metadata sync for thick clients: cheap fields
+        only (no image bytes), so a client can determine locally whether a
+        candidate photo is already in the library (and browse/preview via
+        /thumb/<uuid>) without a network round trip per file."""
+        since_param = request.args.get("since")
+        since = datetime.fromtimestamp(float(since_param), tz=UTC) if since_param else None
+        limit = int(request.args.get("limit", 5000))
+        photos = store.since(since, limit)
+        return {
+            "photos": [ph.lean_dict() for ph in photos],
+            "next_since": photos[-1].scanned.timestamp() if photos else since_param,
+        }

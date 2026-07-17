@@ -66,6 +66,12 @@ class WebPDBClient(AbstractPDBClient):
         self.process_response(r)
         return _response_content(r)
 
+    def get_thumbnail(self, uuid: str) -> bytes:
+        url = f"{self.url}/thumb/{uuid}"
+        r = self.client.get(url, **self.http_kwargs)
+        self.process_response(r)
+        return _response_content(r)
+
     def get_meta(self, uuid: str) -> Photo:
         url = f"{self.url}/meta/{uuid}"
         r = self.client.get(url, **self.http_kwargs)
@@ -74,6 +80,15 @@ class WebPDBClient(AbstractPDBClient):
 
     def hashes(self) -> dict[str, str]:
         url = f"{self.url}/hashes"
+        r = self.client.get(url, **self.http_kwargs)
+        self.process_response(r)
+        return _response_json(r)
+
+    def sync_since(self, since: float | None = None, limit: int = 5000) -> dict:
+        query = f"limit={limit}"
+        if since is not None:
+            query += f"&since={since}"
+        url = f"{self.url}/sync?{query}"
         r = self.client.get(url, **self.http_kwargs)
         self.process_response(r)
         return _response_json(r)

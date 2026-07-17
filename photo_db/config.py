@@ -1,4 +1,5 @@
 import tempfile
+from os.path import expanduser, join
 
 from dotenv import load_dotenv
 from environs import Env
@@ -28,6 +29,7 @@ class Config:
         similarity: int | None = None,
         file_uid: int | None = None,
         file_gid: int | None = None,
+        lean_cache_path: str | None = None,
     ):
         self.STORE_URL = (
             store_url if store_url is not None else env.str("PH_STORE_URL", "/photodb")
@@ -40,6 +42,13 @@ class Config:
         self.SIMILARITY = similarity if similarity is not None else env.int("PH_SIMILARITY", 97)
         self.FILE_UID = file_uid if file_uid is not None else env.int("PH_UID", None)
         self.FILE_GID = file_gid if file_gid is not None else env.int("PH_GID", None)
+        # Local sqlite cache of lean (metadata-only) sync data from the
+        # central store, used by the thick client to browse/dedup-check
+        # without a network round trip per photo. Defaults to a per-user
+        # location outside the (possibly remote-mirrored) STORE_URL.
+        self.LEAN_CACHE_PATH = lean_cache_path or env.str(
+            "PH_LEAN_CACHE_PATH", join(expanduser("~"), ".photodb", "lean_cache.db")
+        )
         self._temp_folder: str | None = None
 
     def diff_limit(self) -> int:

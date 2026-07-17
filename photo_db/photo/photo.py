@@ -146,6 +146,24 @@ class Photo(BaseModel):
             self.filename(),
         )
 
+    def lean_dict(self) -> dict:
+        """Cheap metadata only (no image bytes) - used for incremental
+        sync to thick clients so they can determine locally whether a
+        candidate photo already exists in the library, and browse/preview
+        via a separate thumbnail fetch."""
+        return {
+            "uuid": self.uuid,
+            "hash": self.hash,
+            "date": self.date.timestamp(),
+            "width": self.width,
+            "height": self.height,
+            "camera": self.camera,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "extension": self.extension,
+            "scanned": self.scanned.timestamp(),
+        }
+
     def filename(self) -> str:
         d = self.date
         # Fixed-width numeric prefix (no separators) so that filenames sort
