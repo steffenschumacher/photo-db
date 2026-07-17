@@ -10,8 +10,8 @@ load_dotenv()
 class Config:
     STORE_URL = env.str("PH_STORE_URL", "/photodb").rstrip("/")
     SSL_VERIFY = env.bool("PH_SSL_VERIFY", False)
-    STORE_USER = env.str("PH_STORE_USER", "peterpan")
-    STORE_PASS = env.str("PH_STORE_PASS", "jegergod!QAZ2wsx")
+    STORE_USER = env.str("PH_STORE_USER", None)
+    STORE_PASS = env.str("PH_STORE_PASS", None)
     # https://medium.com/@somilshah112/how-to-find-duplicate-or-similar-images-quickly-with-python-2d636af9452f
     HASH_SIZE = env.int("PH_HASH_SIZE", 70)
     SIMILARITY = env.int("PH_SIMILARITY", 97)
@@ -37,7 +37,7 @@ class Config:
         kvs = {
             "url": cls.STORE_URL,
             "user": cls.STORE_USER,
-            "pw": cls.STORE_PASS,
+            "pw": "***" if cls.STORE_PASS else None,
             "hash": cls.HASH_SIZE,
             "similarity": cls.SIMILARITY,
         }

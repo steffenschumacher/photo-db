@@ -6,7 +6,7 @@ from .abstract_client import AbstractPDBClient
 
 class LocalPDBClient(AbstractPDBClient):
     def check_hash(self, ph: Photo) -> bool:
-        return LocalStore.check_hash(hash)
+        return LocalStore.check_hash(ph)
 
     def upload(self, image: bytes):
         return LocalStore.upload(image)

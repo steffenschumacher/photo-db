@@ -48,15 +48,15 @@ class ScanDB:
         self.cnx.commit()
 
     def get_photo(self, uuid: str) -> LocalPhoto:
-        qry = f"{self.select} WHERE uuid = '{uuid}')"
-        if cur := self.cnx.execute(qry):
-            r = next(cur)
+        qry = f"{self.select} WHERE uuid = ?;"
+        cur = self.cnx.execute(qry, (uuid,))
+        if r := next(cur, None):
             photo_args = {f: r[idx] for idx, f in enumerate(self.table.keys())}
             return LocalPhoto(**photo_args)
 
     def lookup_hash(self, hash: str) -> str | None:
-        if cur := self.cnx.execute(f"{self.select} WHERE hash = '{hash}')"):
-            r = next(cur)
+        cur = self.cnx.execute(f"{self.select} WHERE hash = ?;", (hash,))
+        if r := next(cur, None):
             return r[0]  # uuid is first value
 
     def search(
@@ -67,22 +67,29 @@ class ScanDB:
     ) -> list[LocalPhoto]:
         fields = [f for f in self.table.keys()]
         criteria = []
+        params = []
         if start:
-            criteria.append(f"date >= {int(start.timestamp())}")
+            criteria.append("date >= ?")
+            params.append(int(start.timestamp()))
         if end:
-            criteria.append(f"date <= {int(end.timestamp())}")
+            criteria.append("date <= ?")
+            params.append(int(end.timestamp()))
         if circle:
-            criteria.append(f"latitude >= {circle[0] - circle[2]}")
-            criteria.append(f"latitude <= {circle[0] + circle[2]}")
-            criteria.append(f"longitude >= {circle[1] - circle[2]}")
-            criteria.append(f"longitude <= {circle[1] + circle[2]}")
+            criteria.append("latitude >= ?")
+            params.append(circle[0] - circle[2])
+            criteria.append("latitude <= ?")
+            params.append(circle[0] + circle[2])
+            criteria.append("longitude >= ?")
+            params.append(circle[1] - circle[2])
+            criteria.append("longitude <= ?")
+            params.append(circle[1] + circle[2])
         where = ""
         if criteria:
             where = f" WHERE {' AND '.join(criteria)}"
         qry = f"SELECT {','.join(fields)} FROM photo{where};"
 
         results = []
-        for r in self.cnx.execute(qry):
+        for r in self.cnx.execute(qry, tuple(params)):
             photo_args = {f: r[idx] for idx, f in enumerate(self.table.keys())}
             results.append(LocalPhoto(**photo_args))
         return results

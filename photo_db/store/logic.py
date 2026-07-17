@@ -41,17 +41,14 @@ class LocalStore:
             photo_path = cls.abs_folder(ph.db_path())
             if exists(photo_path):
                 raise dup
-        try:
-            with open(photo_path, "wb") as new_pic:
-                new_pic.write(photo)
-            if Config.FILE_GID or Config.FILE_UID:
-                # -1 means dont change
-                uid = Config.FILE_UID or -1
-                gid = Config.FILE_GID or -1
-                chown(photo_path, uid, gid)
-            return ph.uuid
-        except Exception as e:
-            print(e)
+        with open(photo_path, "wb") as new_pic:
+            new_pic.write(photo)
+        if Config.FILE_GID or Config.FILE_UID:
+            # -1 means dont change
+            uid = Config.FILE_UID or -1
+            gid = Config.FILE_GID or -1
+            chown(photo_path, uid, gid)
+        return ph.uuid
 
     @classmethod
     def get_photo(cls, uuid: str) -> Photo:

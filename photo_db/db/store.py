@@ -72,11 +72,11 @@ def get_hashes() -> dict[str, str]:
 
 def get_photo(uuid: str) -> Photo:
     global _select, _table
-    qry = f"{_select} WHERE uuid = '{uuid}';"
+    qry = f"{_select} WHERE uuid = ?;"
 
     c = _cnx()
     try:
-        for r in c.execute(qry):
+        for r in c.execute(qry, (uuid,)):
             photo_args = {f: r[idx] for idx, f in enumerate(_table.keys())}
             return Photo(**photo_args)
     finally:
@@ -88,7 +88,7 @@ def lookup_hash(hash: str) -> str | None:
     global _select
     c = _cnx()
     try:
-        for r in c.execute(f"{_select} WHERE hash = '{hash}';"):
+        for r in c.execute(f"{_select} WHERE hash = ?;", (hash,)):
             return r[0]  # uuid is first value
     finally:
         if c:
@@ -103,26 +103,34 @@ def search(
     global _table
     fields = [f for f in _table.keys()]
     criteria = []
+    params = []
     if start:
-        criteria.append(f"date >= {int(start.timestamp())}")
+        criteria.append("date >= ?")
+        params.append(int(start.timestamp()))
     if end:
-        criteria.append(f"date <= {int(end.timestamp())}")
+        criteria.append("date <= ?")
+        params.append(int(end.timestamp()))
     if circle:
-        criteria.append(f"latitude >= {circle[0] - circle[2]}")
-        criteria.append(f"latitude <= {circle[0] + circle[2]}")
-        criteria.append(f"longitude >= {circle[1] - circle[2]}")
-        criteria.append(f"longitude <= {circle[1] + circle[2]}")
+        criteria.append("latitude >= ?")
+        params.append(circle[0] - circle[2])
+        criteria.append("latitude <= ?")
+        params.append(circle[0] + circle[2])
+        criteria.append("longitude >= ?")
+        params.append(circle[1] - circle[2])
+        criteria.append("longitude <= ?")
+        params.append(circle[1] + circle[2])
     where = ""
     if criteria:
         where = f" WHERE {' AND '.join(criteria)}"
-    qry = f"SELECT {','.join(fields)} FROM photo{where})"
+    qry = f"SELECT {','.join(fields)} FROM photo{where}"
 
     c = _cnx()
     results = []
     try:
-        for r in c.execute(qry):
+        for r in c.execute(qry, tuple(params)):
             photo_args = {f: r[idx] for idx, f in enumerate(_table.keys())}
             results.append(Photo(**photo_args))
+        return results
     finally:
         if c:
             c.close()
@@ -137,5 +145,6 @@ __all__ = [
     "insert_photo",
     "get_photo",
     "get_hashes",
+    "lookup_hash",
     "search",
 ]

@@ -137,13 +137,18 @@ class Photo(BaseModel):
 
     def db_path(self) -> str:
         return join(
-            f"{self.date.year}",
-            f"{self.date.month}",
+            f"{self.date.year:04d}",
+            f"{self.date.month:02d}",
             self.filename(),
         )
 
     def filename(self) -> str:
-        return f"{self.date.strftime('%d-%H%M%S')}-{self.uuid[-4:]}.{self.extension}".lower()
+        d = self.date
+        # Fixed-width numeric prefix (no separators) so that filenames sort
+        # chronologically within a month while remaining unique: day-of-month
+        # (2 digits) + hour (2) + minute (2) + second (2) + millisecond (3).
+        prefix = f"{d.day:02d}{d.hour:02d}{d.minute:02d}{d.second:02d}{d.microsecond // 1000:03d}"
+        return f"{prefix}_{self.uuid[-4:]}.{self.extension}".lower()
 
 
 class LocalPhoto(Photo):
