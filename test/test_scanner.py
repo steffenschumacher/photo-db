@@ -57,3 +57,31 @@ def test_scan(local_store_client, clean_store, test_config):
     # a follow-up, not fixed in this pass to avoid changing scan behavior
     # beyond what was requested.
     assert len(uploaded) == 3
+
+
+def test_scan_from_a_different_thread_than_construction(
+    local_store_client, clean_store, test_config
+):
+    """Regression test for the desktop UI's threading pattern: ScanDialog
+    builds a Scanner on the GUI thread, but a QThread worker actually
+    drives scan_dir()/uploading_complete() - both ScanDB and LeanCache must
+    tolerate that (sqlite connections aren't cross-thread safe by default)."""
+    from threading import Thread
+
+    sc = Scanner(local_store_client, config=test_config)
+    folder = str(STATIC_DIR)
+    errors = []
+
+    def _drive():
+        try:
+            sc.scan_dir(folder)
+            sc.uploading_complete(blocking=True)
+        except Exception as e:  # noqa: BLE001
+            errors.append(e)
+
+    t = Thread(target=_drive)
+    t.start()
+    t.join(timeout=30)
+
+    assert not errors, f"scan driven from a worker thread raised: {errors}"
+    assert sc.processed == sc.detected
