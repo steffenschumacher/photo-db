@@ -1,4 +1,5 @@
 import tempfile
+from importlib.util import find_spec
 
 from photo_db.config import Config
 from photo_db.db.lean_cache import LeanCache
@@ -70,7 +71,14 @@ def test_scan(local_store_client, clean_store, test_config):
     # uploaded alongside the original rather than replacing it - flagged as
     # a follow-up, not fixed in this pass to avoid changing scan behavior
     # beyond what was requested.
-    assert len(uploaded) == 4
+    #
+    # 15175111__DSC04832.ARW is only counted as a 5th upload when the
+    # optional 'raw' extra (rawpy+imageio) is installed - e.g. on CI/Linux,
+    # but not on macOS, where rawpy fails to build (see pyproject.toml).
+    # Without it, convert_raw() raises ModuleNotFoundError and the file
+    # ends up "ignored" instead.
+    raw_available = find_spec("rawpy") is not None and find_spec("imageio") is not None
+    assert len(uploaded) == (5 if raw_available else 4)
 
 
 def test_process_image_uploads_photo_missing_only_gps(local_store_client, clean_store, test_config):
