@@ -9,4 +9,3 @@ services:
       - PH_STORE_URL=/photodb
     volumes:
      - ./photo_store:/photodb
-

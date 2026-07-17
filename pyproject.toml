@@ -55,7 +55,7 @@ markers = [
     "gui: tests that open real desktop GUI windows (excluded by default)",
     "network: tests that hit live third-party network services (not mocked yet, see docs/PROJECT_STATUS_AND_PLAN.md)",
 ]
-addopts = "-m 'not gui'"
+addopts = "-m 'not gui and not network'"
 
 [tool.ruff]
 target-version = "py313"
