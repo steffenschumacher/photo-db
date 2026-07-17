@@ -136,22 +136,19 @@ class Scanner:
                 ph = convert_raw(full, self.config)
             else:
                 ph = LocalPhoto.from_file(full, config=self.config)
-            if not ph.camera or not ph.latitude or not ph.longitude or not ph.date:
-                ph.latitude = ph.latitude or 0
-                ph.longitude = ph.longitude or 0
-                ph.altitude = ph.altitude or 0
-                ph.camera = ph.camera or "N/A"
-                ph.date = ph.date or datetime.fromtimestamp(0.0)
-                reasons = []
-                if not ph.camera:
-                    reasons.append("camera")
-                if not ph.latitude:
-                    reasons.append("GPS")
-                if not ph.date:
-                    reasons.append("date")
-                ph.reject_reason = f"Incomplete EXIF data ({'+'.join(reasons)})"
-                ph.status = "exif"
-                return ph
+            # GPS is deliberately not required for upload eligibility:
+            # plenty of legitimate photos (older/non-phone cameras, GPS
+            # disabled, etc.) simply never had location data to begin
+            # with - rejecting those wholesale would silently exclude a
+            # lot of otherwise-valid library content. Camera and capture
+            # date don't need an equivalent check here: both are
+            # non-optional fields on Photo, so LocalPhoto.from_file()/
+            # convert_raw() already raise ValueError (handled below,
+            # status "ignored") rather than ever producing a Photo with
+            # either one missing.
+            ph.latitude = ph.latitude or 0
+            ph.longitude = ph.longitude or 0
+            ph.altitude = ph.altitude or 0
         except (ValueError, ImportError, ModuleNotFoundError) as ve:
             print(f"{file} is not a valid photo - skipping: {ve}")
             reason = ve.args[0].split(": ")[-1] if ve.args else str(ve)
