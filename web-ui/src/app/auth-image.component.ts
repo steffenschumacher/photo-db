@@ -6,16 +6,17 @@ import {
   OnChanges,
   OnDestroy,
   ViewChild,
+  signal,
 } from '@angular/core';
-import { ApiService } from './api.service';
+import { ThumbnailLoaderService, ThumbnailRequest } from './thumbnail-loader.service';
 
 @Component({
   selector: 'app-auth-image',
   standalone: true,
   template: `<div #host class="frame">
     <span>Loading…</span>
-    @if (url) {
-      <img [src]="url" [alt]="alt" />
+    @if (url()) {
+      <img [src]="url()" [alt]="alt" />
     }
   </div>`,
   styles: [
@@ -42,9 +43,11 @@ export class AuthImageComponent implements OnChanges, AfterViewInit, OnDestroy {
   @Input({ required: true }) uuid!: string;
   @Input() alt = '';
   @ViewChild('host', { static: true }) host!: ElementRef<HTMLElement>;
-  url: string | null = null;
+  readonly url = signal<string | null>(null);
   private observer?: IntersectionObserver;
-  constructor(private readonly api: ApiService) {}
+  private request?: ThumbnailRequest;
+  private loadingUuid?: string;
+  constructor(private readonly loader: ThumbnailLoaderService) {}
   ngOnChanges(): void {
     if (this.host) this.observe();
   }
@@ -53,6 +56,7 @@ export class AuthImageComponent implements OnChanges, AfterViewInit, OnDestroy {
   }
   ngOnDestroy(): void {
     this.observer?.disconnect();
+    this.cancel();
     this.release();
   }
   private observe(): void {
@@ -60,24 +64,42 @@ export class AuthImageComponent implements OnChanges, AfterViewInit, OnDestroy {
     this.observer?.disconnect();
     this.observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          this.load();
-          this.observer?.disconnect();
-        }
+        const visible = entries.find((entry) => entry.isIntersecting);
+        if (visible) this.load(visible.boundingClientRect);
+        else if (!this.url()) this.cancel();
       },
-      { rootMargin: '300px' },
+      { rootMargin: '0px', threshold: 0.01 },
     );
     this.observer.observe(this.host.nativeElement);
   }
-  private async load(): Promise<void> {
+  private async load(rect: DOMRectReadOnly): Promise<void> {
+    if (this.url() || this.loadingUuid === this.uuid) return;
+    this.cancel();
+    const uuid = this.uuid;
+    this.loadingUuid = uuid;
+    const priority = Math.abs(rect.top + rect.height / 2 - window.innerHeight / 2);
+    const request = this.loader.request(uuid, priority);
+    this.request = request;
     try {
-      this.url = URL.createObjectURL(await this.api.thumbnail(this.uuid));
+      const blob = await request.promise;
+      if (this.uuid === uuid) this.url.set(URL.createObjectURL(blob));
     } catch {
       /* placeholder remains */
+    } finally {
+      if (this.request === request) {
+        this.loadingUuid = undefined;
+        this.request = undefined;
+      }
     }
   }
+  private cancel(): void {
+    this.request?.cancel();
+    this.request = undefined;
+    this.loadingUuid = undefined;
+  }
   private release(): void {
-    if (this.url) URL.revokeObjectURL(this.url);
-    this.url = null;
+    const url = this.url();
+    if (url) URL.revokeObjectURL(url);
+    this.url.set(null);
   }
 }

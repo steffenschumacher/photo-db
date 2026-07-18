@@ -87,7 +87,10 @@ export class ScannerService {
     const file = result.file;
     if (/\.(arw|cr2|cr3|nef|dng|raw)$/i.test(file.name))
       return { ...result, status: 'desktop', detail: 'RAW files require the desktop client' };
-    if (!/\.(jpe?g|heic|heif)$/i.test(file.name))
+    const supportedType = ['image/jpeg', 'image/heic', 'image/heif'].includes(
+      file.type.toLowerCase(),
+    );
+    if (!/\.(jpe?g|heic|heif)$/i.test(file.name) && !supportedType)
       return { ...result, status: 'desktop', detail: 'Unsupported image format' };
 
     const metadata = await exifr.parse(file, ['Make', 'Model', 'DateTimeOriginal', 'CreateDate']);

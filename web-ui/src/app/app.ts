@@ -103,6 +103,31 @@ export class App implements OnInit {
     this.visibleLimit.update((limit) => limit + 200);
   }
   async scan(): Promise<void> {
+    await this.runScan((config, progress, signal) =>
+      this.scanner.selectAndScan(config, progress, signal),
+    );
+  }
+  async scanSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    if (!files.length) return;
+    await this.runScan((config, progress, signal) =>
+      this.scanner.scanFiles(
+        files.map((file) => ({ file, path: file.name })),
+        config,
+        progress,
+        signal,
+      ),
+    );
+  }
+  private async runScan(
+    operation: (
+      config: WebConfig,
+      progress: (result: ScanResult, processed: number, total: number) => void,
+      signal: AbortSignal,
+    ) => Promise<ScanResult[]>,
+  ): Promise<void> {
     const config = this.config();
     if (!config) return;
     this.scanning.set(true);
@@ -112,7 +137,7 @@ export class App implements OnInit {
     this.message.set('Scanning locally — no image bytes are being uploaded');
     const current = new Map<number, ScanResult>();
     try {
-      await this.scanner.selectAndScan(
+      await operation(
         config,
         (result, processed, total) => {
           current.set(result.id, result);

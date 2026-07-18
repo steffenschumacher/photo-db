@@ -29,8 +29,8 @@ export class ApiService {
     if (since !== null) query.set('since', String(since));
     return this.json(`/sync?${query}`);
   }
-  async thumbnail(uuid: string): Promise<Blob> {
-    return this.request(`/thumb/${uuid}`).then((r) => r.blob());
+  async thumbnail(uuid: string, signal?: AbortSignal): Promise<Blob> {
+    return this.request(`/thumb/${uuid}`, { signal }).then((r) => r.blob());
   }
   async image(uuid: string): Promise<Blob> {
     return this.request(`/image/${uuid}`).then((r) => r.blob());

@@ -22,9 +22,9 @@ jobs:
         working-directory: web-ui
         run: npm ci && npm test -- --watch=false && npm run build
 
-      - name: Install Chromium for web acceptance tests
+      - name: Install Chromium and WebKit for web acceptance tests
         working-directory: web-ui
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4

@@ -117,11 +117,11 @@ uv run flask --app photo_db.app:create_app run
 
 ## Browser companion
 
-The Angular companion browses the remote library and scans a local folder
+The Angular companion browses the remote library and scans selected photos
 without uploading image bytes until a file has passed local EXIF and
-perceptual-duplicate checks. Folder scanning requires Chrome or Edge; browsing
-works in other modern browsers. Credentials use HTTP Basic Auth and are kept
-only in memory and `sessionStorage`.
+perceptual-duplicate checks. iPhone Safari can select multiple camera-roll photos;
+recursive folder scanning requires Chrome or Edge. Credentials use HTTP Basic Auth
+and are kept only in memory and `sessionStorage`.
 
 For frontend development, install a current Node 22 LTS release, then run:
 
@@ -130,7 +130,7 @@ cd web-ui
 npm ci
 npm start             # development server
 npm test -- --watch=false
-npm run e2e           # real Chromium fixture + upload acceptance test
+npm run e2e           # real Chromium and Mobile Safari/WebKit acceptance tests
 npm run build         # production bundle in web-ui/dist/web-ui/browser
 ```
 

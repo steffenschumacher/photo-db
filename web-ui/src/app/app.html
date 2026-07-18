@@ -30,6 +30,17 @@
     </div>
     <nav>
       <button (click)="refresh()" [disabled]="busy()">Sync library</button>
+      <button class="primary" (click)="photoPicker.click()" [disabled]="scanning()">
+        Select photos
+      </button>
+      <input
+        #photoPicker
+        class="photo-picker"
+        type="file"
+        multiple
+        accept=".jpg,.jpeg,.heic,.heif,image/jpeg,image/heic,image/heif"
+        (change)="scanSelected($event)"
+      />
       <button class="primary" (click)="scan()" [disabled]="scanning() || !scanSupported">
         {{ scanning() ? 'Scanning…' : 'Scan a folder' }}
       </button>
@@ -42,7 +53,8 @@
   <main class="content">
     @if (!scanSupported) {
       <aside class="notice">
-        Folder scanning needs Chrome or Edge. Library browsing works in this browser.
+        Folder scanning needs Chrome or Edge. Use <strong>Select photos</strong> to choose images
+        from this device or an iPhone camera roll.
       </aside>
     }
     <section class="toolbar">

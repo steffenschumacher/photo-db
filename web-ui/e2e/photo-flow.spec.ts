@@ -12,7 +12,9 @@ async function fixture(name: string, type: string) {
 test('classifies real JPEG/HEIF fixtures locally and uploads eligible new files', async ({
   page,
   request,
+  browserName,
 }) => {
+  test.skip(browserName !== 'chromium', 'directory picker flow is Chromium-specific');
   const jpeg = await fixture('08-190641-4631.jpeg', 'image/jpeg');
   const modified = await fixture('08-190641-4631-modified.jpeg', 'image/jpeg');
   const incomplete = await fixture('25-121007-33d0.jpeg', 'image/jpeg');

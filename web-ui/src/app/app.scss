@@ -99,6 +99,13 @@ nav {
   gap: 0.6rem;
   flex-wrap: wrap;
 }
+.photo-picker {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
 .content {
   padding: 2rem clamp(1rem, 4vw, 4rem) 5rem;
   display: grid;

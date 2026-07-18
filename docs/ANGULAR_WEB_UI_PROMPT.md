@@ -8,7 +8,9 @@
 > **Implementation override:** the original IndexedDB suggestion below was
 > superseded by the project owner's decision to keep lean metadata in memory
 > only. The web client performs a fresh paginated `/sync` on page load, manual
-> refresh, and immediately before every folder scan.
+> refresh, and immediately before every scan. Safari/iPhone support was later
+> added through a multi-file picker for camera-roll photos; recursive directory
+> walking remains Chromium-only.
 
 ## Goal
 

@@ -2,12 +2,14 @@
 
 The Angular 22 application in `web-ui/` is a same-origin companion to the
 desktop client. It loads lean `/sync` metadata into session memory, fetches
-authenticated thumbnails only as cards approach the viewport, and opens full
+authenticated thumbnails through a bounded, viewport-prioritized queue, and opens full
 images on demand. Basic Auth credentials are retained only for the browser tab
 session. No metadata is retained in IndexedDB or any other browser database;
 each refresh and each folder scan starts a new paginated sync from the backend.
 
-Chrome and Edge additionally expose **Scan a folder**. The browser walks the
+Every supported browser exposes **Select photos**, which accepts multiple JPEG/HEIC
+images from a normal file chooser or an iPhone Safari camera roll. Chrome and Edge
+additionally expose **Scan a folder**. The browser walks the
 chosen directory locally, rejects RAW/unsupported files, checks camera/date
 EXIF before image decoding, and calculates the Python-compatible 70×70 average
 hash at all four rotations. Candidate hashes are compared with the in-memory
@@ -38,9 +40,9 @@ report **desktop**.
 Rotate a JPEG physically (not only via EXIF) and rescan it to validate the
 rotation variants.
 
-The Playwright acceptance test automates this flow in real Chromium, including
-browser HEIF decode, upload, server-side Pillow hashing, and a second scan that
-must recognize the uploaded HEIF as a duplicate.
+The Playwright acceptance tests automate this flow in real Chromium and WebKit,
+including browser HEIF decode, upload, server-side Pillow hashing, Mobile Safari
+camera-roll selection, rendered thumbnails, and viewport-only loading.
 
 No additional online HEIC fixture is committed: the samples located during
 implementation did not carry sufficiently explicit image-level redistribution

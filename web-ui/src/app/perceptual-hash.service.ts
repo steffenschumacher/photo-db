@@ -15,16 +15,20 @@ export class PerceptualHashService {
     file: File,
     hashSize: number,
   ): Promise<{ variants: string[]; width: number; height: number }> {
-    const bitmap = await this.decode(file);
+    const decoded = await this.decode(file);
     try {
-      const width = bitmap.width;
-      const height = bitmap.height;
-      const canvas = new OffscreenCanvas(hashSize, hashSize);
+      const width = decoded.width;
+      const height = decoded.height;
+      // HTMLCanvasElement works in iOS Safari as well as desktop browsers;
+      // OffscreenCanvas is not available on older supported iPhones.
+      const canvas = document.createElement('canvas');
+      canvas.width = hashSize;
+      canvas.height = hashSize;
       const context = canvas.getContext('2d', { willReadFrequently: true });
       if (!context) throw new Error('Canvas is unavailable');
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = 'high';
-      context.drawImage(bitmap, 0, 0, hashSize, hashSize);
+      context.drawImage(decoded.source, 0, 0, hashSize, hashSize);
       const rgba = context.getImageData(0, 0, hashSize, hashSize).data;
       const gray = new Uint8Array(hashSize ** 2);
       let sum = 0;
@@ -46,19 +50,68 @@ export class PerceptualHashService {
       }
       return { variants, width, height };
     } finally {
-      bitmap.close();
+      decoded.close();
     }
   }
 
-  private async decode(file: File): Promise<ImageBitmap> {
-    if (/\.(heic|heif)$/i.test(file.name)) {
+  private async decode(file: File): Promise<{
+    source: CanvasImageSource;
+    width: number;
+    height: number;
+    close: () => void;
+  }> {
+    const heic = /\.(heic|heif)$/i.test(file.name) || /image\/hei[cf]/i.test(file.type);
+    try {
+      // Safari can decode photos selected directly from the camera roll,
+      // including HEIC on supported iOS versions. Prefer that native path.
+      return await this.decodeNative(file);
+    } catch (nativeError) {
+      if (!heic) throw nativeError;
       const { default: heic2any } = await import('heic2any');
       const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 1 });
-      return createImageBitmap(Array.isArray(converted) ? converted[0] : converted, {
-        imageOrientation: 'none',
-      });
+      return this.decodeNative(Array.isArray(converted) ? converted[0] : converted);
     }
-    return createImageBitmap(file, { imageOrientation: 'none' });
+  }
+  private async decodeNative(blob: Blob): Promise<{
+    source: CanvasImageSource;
+    width: number;
+    height: number;
+    close: () => void;
+  }> {
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bitmap = await createImageBitmap(blob, { imageOrientation: 'none' });
+        return {
+          source: bitmap,
+          width: bitmap.width,
+          height: bitmap.height,
+          close: () => bitmap.close(),
+        };
+      } catch {
+        // iOS Safari may support a format through <img> but not through
+        // createImageBitmap, so continue to the DOM image fallback.
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const image = new Image();
+    image.src = url;
+    try {
+      if (typeof image.decode === 'function') await image.decode();
+      else
+        await new Promise<void>((resolve, reject) => {
+          image.onload = () => resolve();
+          image.onerror = () => reject(new Error('Browser could not decode this photo'));
+        });
+      return {
+        source: image,
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+        close: () => URL.revokeObjectURL(url),
+      };
+    } catch (error) {
+      URL.revokeObjectURL(url);
+      throw error;
+    }
   }
   private rotateClockwise(
     source: Uint8Array<ArrayBufferLike>,
