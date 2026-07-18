@@ -41,6 +41,15 @@
         accept=".jpg,.jpeg,.heic,.heif,image/jpeg,image/heic,image/heif"
         (change)="scanSelected($event)"
       />
+      <label class="auto-upload">
+        <input
+          type="checkbox"
+          [checked]="autoUpload()"
+          [disabled]="scanning()"
+          (change)="autoUpload.set($any($event.target).checked)"
+        />
+        Auto-upload eligible
+      </label>
       <button class="primary" (click)="scan()" [disabled]="scanning() || !scanSupported">
         {{ scanning() ? 'Scanning…' : 'Scan a folder' }}
       </button>
@@ -70,15 +79,12 @@
         </select></label
       >
     </section>
-    @if (scanResults().length) {
+    @if (scanning() || scanResults().length) {
       <section class="scan-panel">
         <div class="section-title">
           <div>
             <p class="eyebrow">Local scan</p>
             <h2>Review files</h2>
-            @if (scanning()) {
-              <small>{{ scanProgress().processed }} / {{ scanProgress().total }} processed</small>
-            }
           </div>
           <button
             class="primary"
@@ -88,6 +94,46 @@
             Upload {{ selectedCount() }} new
           </button>
         </div>
+        @if (scanning() || scanProgress().total) {
+          <div class="progress-card" aria-live="polite">
+            <div class="progress-heading">
+              <strong>Scanning {{ scanSummary().percent }}%</strong>
+              <span>{{ scanSummary().processed }} of {{ scanSummary().total }}</span>
+            </div>
+            <progress
+              aria-label="Scanning progress"
+              [value]="scanSummary().processed"
+              [max]="scanSummary().total || 1"
+            ></progress>
+            <div class="progress-counts">
+              <span
+                ><strong>{{ scanSummary().total }}</strong> selected</span
+              >
+              <span
+                ><strong>{{ scanSummary().unscanned }}</strong> unscanned</span
+              >
+              <span
+                ><strong>{{ scanSummary().duplicates }}</strong> duplicates</span
+              >
+              <span
+                ><strong>{{ scanSummary().eligible }}</strong> upload eligible</span
+              >
+            </div>
+          </div>
+        }
+        @if (uploadProgress().active) {
+          <div class="progress-card" aria-live="polite">
+            <div class="progress-heading">
+              <strong>Uploading {{ uploadPercent() }}%</strong>
+              <span>{{ uploadProgress().processed }} of {{ uploadProgress().total }}</span>
+            </div>
+            <progress
+              aria-label="Upload progress"
+              [value]="uploadProgress().processed"
+              [max]="uploadProgress().total || 1"
+            ></progress>
+          </div>
+        }
         <div class="scan-list">
           @for (row of scanResults(); track row.id) {
             <div class="scan-row" [class]="row.status">

@@ -23,12 +23,18 @@ test.describe('iPhone Safari companion', () => {
       rotation: 0,
     }));
     let thumbnailRequests = 0;
+    let activeThumbnailRequests = 0;
+    let maxActiveThumbnailRequests = 0;
     await page.route('**/sync?**', (route) =>
       route.fulfill({ json: { photos, next_since: null } }),
     );
     await page.route('**/thumb/**', async (route) => {
       thumbnailRequests++;
+      activeThumbnailRequests++;
+      maxActiveThumbnailRequests = Math.max(maxActiveThumbnailRequests, activeThumbnailRequests);
+      await new Promise((resolve) => setTimeout(resolve, 75));
       await route.fulfill({ body: thumbnail, contentType: 'image/jpeg' });
+      activeThumbnailRequests--;
     });
 
     await signIn(page);
@@ -43,6 +49,7 @@ test.describe('iPhone Safari companion', () => {
       )
       .toBeGreaterThan(0);
     expect(thumbnailRequests).toBeLessThan(20);
+    expect(maxActiveThumbnailRequests).toBeLessThanOrEqual(6);
 
     const initiallyLoaded = thumbnailRequests;
     await page.locator('.photo').nth(40).scrollIntoViewIfNeeded();
@@ -54,7 +61,10 @@ test.describe('iPhone Safari companion', () => {
     await page.route('**/sync?**', (route) =>
       route.fulfill({ json: { photos: [], next_since: null } }),
     );
-    await page.route('**/upload', (route) => route.fulfill({ body: 'mobile-upload-id' }));
+    await page.route('**/upload', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await route.fulfill({ body: 'mobile-upload-id' });
+    });
     await signIn(page);
 
     const picker = page.locator('input[type=file]');
@@ -66,10 +76,75 @@ test.describe('iPhone Safari companion', () => {
     });
 
     await expect(page.getByText('Local scan complete')).toBeVisible();
+    await expect(page.getByLabel('Scanning progress')).toHaveAttribute('value', '1');
+    await expect(page.getByText('1 upload eligible')).toBeVisible();
     const row = page.locator('.scan-row').filter({ hasText: 'IMG_0001.JPG' });
     await expect(row).toContainText('new');
     await page.getByRole('button', { name: 'Upload 1 new' }).click();
+    await expect(page.getByLabel('Upload progress')).toBeVisible();
     await expect(row).toContainText('uploaded');
+  });
+
+  test('shows progress immediately for a larger camera-roll selection', async ({ page }) => {
+    await page.route('**/sync?**', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await route.fulfill({ json: { photos: [], next_since: null } });
+    });
+    await signIn(page);
+
+    const buffer = await readFile(resolve(staticDir, '08-190641-4631.jpeg'));
+    const files = Array.from({ length: 12 }, (_, index) => ({
+      name: `IMG_${String(index).padStart(4, '0')}.JPG`,
+      mimeType: 'image/jpeg',
+      buffer,
+    }));
+    await page.locator('input[type=file]').setInputFiles(files);
+
+    await expect(page.getByText('12 selected')).toBeVisible();
+    await expect(page.getByText('12 unscanned')).toBeVisible();
+    await expect(page.getByLabel('Scanning progress')).toBeVisible();
+    await expect(page.getByText('Local scan complete')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('0 unscanned')).toBeVisible();
+    await expect(page.getByText('11 duplicates')).toBeVisible();
+    await expect(page.getByText('1 upload eligible')).toBeVisible();
+  });
+
+  test('auto-uploads eligible photos one at a time while scanning continues', async ({ page }) => {
+    let activeUploads = 0;
+    let maximumActiveUploads = 0;
+    let uploadRequests = 0;
+    await page.route('**/sync?**', (route) =>
+      route.fulfill({ json: { photos: [], next_since: null } }),
+    );
+    await page.route('**/upload', async (route) => {
+      uploadRequests++;
+      activeUploads++;
+      maximumActiveUploads = Math.max(maximumActiveUploads, activeUploads);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      await route.fulfill({ body: `auto-upload-${uploadRequests}` });
+      activeUploads--;
+    });
+    await signIn(page);
+    await page.getByLabel('Auto-upload eligible').check();
+
+    await page.locator('input[type=file]').setInputFiles([
+      {
+        name: 'FIRST.JPG',
+        mimeType: 'image/jpeg',
+        buffer: await readFile(resolve(staticDir, '08-190641-4631.jpeg')),
+      },
+      {
+        name: 'SECOND.JPG',
+        mimeType: 'image/jpeg',
+        buffer: await readFile(resolve(staticDir, '25-121007-33d0.jpeg')),
+      },
+    ]);
+
+    await expect(page.getByLabel('Upload progress')).toBeVisible();
+    await expect(page.getByText('Scan and automatic upload complete')).toBeVisible();
+    await expect(page.locator('.scan-row.uploaded')).toHaveCount(2);
+    expect(uploadRequests).toBe(2);
+    expect(maximumActiveUploads).toBe(1);
   });
 });
 

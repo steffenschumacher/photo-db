@@ -21,7 +21,7 @@ export class ThumbnailLoaderService {
   private readonly cache = new Map<string, Blob>();
   private active = 0;
   private pumpScheduled = false;
-  private readonly concurrency = 3;
+  private readonly concurrency = 6;
   private readonly cacheLimit = 250;
 
   constructor(private readonly api: ApiService) {}

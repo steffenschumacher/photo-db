@@ -50,6 +50,9 @@ export class ScannerService {
     let id = 0;
     for (const { file, path } of files) {
       if (signal?.aborted) throw new DOMException('Scan cancelled', 'AbortError');
+      // Let Safari paint progress and handle input while large camera-roll
+      // selections are processed. Hashing remains sequential to cap memory use.
+      await this.yieldToBrowser();
       let result: ScanResult = {
         id: id++,
         file,
@@ -72,6 +75,10 @@ export class ScannerService {
       progress(result, results.length, files.length);
     }
     return results;
+  }
+
+  private yieldToBrowser(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 0));
   }
 
   async upload(result: ScanResult): Promise<string> {

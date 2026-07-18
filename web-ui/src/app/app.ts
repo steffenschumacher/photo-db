@@ -34,6 +34,8 @@ export class App implements OnInit {
   readonly month = signal('all');
   readonly visibleLimit = signal(200);
   readonly scanProgress = signal({ processed: 0, total: 0 });
+  readonly uploadProgress = signal({ processed: 0, total: 0, active: false });
+  readonly autoUpload = signal(false);
   private scanController?: AbortController;
   readonly authenticated = this.auth.authenticated;
   readonly months = computed(() => [
@@ -48,6 +50,21 @@ export class App implements OnInit {
   readonly selectedCount = computed(
     () => this.scanResults().filter((r) => r.selected && r.status === 'new').length,
   );
+  readonly scanSummary = computed(() => {
+    const progress = this.scanProgress();
+    const results = this.scanResults();
+    return {
+      ...progress,
+      unscanned: Math.max(0, progress.total - progress.processed),
+      duplicates: results.filter((row) => row.status === 'duplicate').length,
+      eligible: results.filter((row) => row.status === 'new' || row.status === 'uploaded').length,
+      percent: progress.total ? Math.round((progress.processed / progress.total) * 100) : 0,
+    };
+  });
+  readonly uploadPercent = computed(() => {
+    const progress = this.uploadProgress();
+    return progress.total ? Math.round((progress.processed / progress.total) * 100) : 0;
+  });
   readonly scanSupported = this.scanner.supported();
 
   async ngOnInit(): Promise<void> {
@@ -112,13 +129,15 @@ export class App implements OnInit {
     const files = Array.from(input.files ?? []);
     input.value = '';
     if (!files.length) return;
-    await this.runScan((config, progress, signal) =>
-      this.scanner.scanFiles(
-        files.map((file) => ({ file, path: file.name })),
-        config,
-        progress,
-        signal,
-      ),
+    await this.runScan(
+      (config, progress, signal) =>
+        this.scanner.scanFiles(
+          files.map((file) => ({ file, path: file.name })),
+          config,
+          progress,
+          signal,
+        ),
+      files.length,
     );
   }
   private async runScan(
@@ -127,32 +146,68 @@ export class App implements OnInit {
       progress: (result: ScanResult, processed: number, total: number) => void,
       signal: AbortSignal,
     ) => Promise<ScanResult[]>,
+    initialTotal = 0,
   ): Promise<void> {
     const config = this.config();
     if (!config) return;
     this.scanning.set(true);
     this.scanController = new AbortController();
-    this.scanProgress.set({ processed: 0, total: 0 });
+    this.scanProgress.set({ processed: 0, total: initialTotal });
+    this.uploadProgress.set({ processed: 0, total: 0, active: false });
     this.scanResults.set([]);
-    this.message.set('Scanning locally — no image bytes are being uploaded');
+    this.message.set(
+      this.autoUpload()
+        ? 'Scanning locally — eligible photos upload one at a time'
+        : 'Scanning locally — no image bytes are being uploaded',
+    );
     const current = new Map<number, ScanResult>();
+    let autoUploadQueue = Promise.resolve();
+    let autoUploadCount = 0;
     try {
+      // Safari needs a paint opportunity after dismissing its camera roll
+      // before metadata decoding and canvas hashing start.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
       await operation(
         config,
         (result, processed, total) => {
           current.set(result.id, result);
           this.scanResults.set([...current.values()].sort((a, b) => a.id - b.id));
           this.scanProgress.set({ processed, total });
+          if (this.autoUpload() && result.status === 'new') {
+            autoUploadCount++;
+            this.uploadProgress.update((upload) => ({
+              ...upload,
+              total: upload.total + 1,
+              active: true,
+            }));
+            autoUploadQueue = autoUploadQueue.then(async () => {
+              const uploaded = { ...result, ...(await this.uploadPatch(result)) };
+              current.set(result.id, uploaded);
+              this.scanResults.set([...current.values()].sort((a, b) => a.id - b.id));
+              this.uploadProgress.update((upload) => ({
+                ...upload,
+                processed: upload.processed + 1,
+              }));
+            });
+          }
         },
         this.scanController.signal,
       );
+      await autoUploadQueue;
+      if (autoUploadCount) await this.cache.sync();
       this.photos.set(this.cache.all());
-      this.message.set('Local scan complete');
+      this.message.set(
+        autoUploadCount ? 'Scan and automatic upload complete' : 'Local scan complete',
+      );
     } catch (error) {
       if ((error as DOMException).name !== 'AbortError')
         this.message.set(error instanceof Error ? error.message : String(error));
     } finally {
+      // Uploads already accepted by the queue are allowed to finish even when
+      // the remaining scan is cancelled.
+      await autoUploadQueue;
       this.scanning.set(false);
+      this.uploadProgress.update((progress) => ({ ...progress, active: false }));
       this.scanController = undefined;
     }
   }
@@ -166,28 +221,21 @@ export class App implements OnInit {
   }
   async uploadSelected(): Promise<void> {
     this.busy.set(true);
-    for (const row of this.scanResults().filter((item) => item.selected && item.status === 'new')) {
-      try {
-        await this.scanner.upload(row);
-        this.replaceScan(row.id, { status: 'uploaded', selected: false, detail: 'Uploaded' });
-      } catch (error) {
-        if (error instanceof ApiConflictError)
-          this.replaceScan(row.id, {
-            status: 'duplicate',
-            selected: false,
-            duplicateUuid: error.uuid,
-            detail: error.message,
-          });
-        else
-          this.replaceScan(row.id, {
-            status: 'error',
-            selected: false,
-            detail: error instanceof Error ? error.message : String(error),
-          });
-      }
+    const selected = this.scanResults().filter((item) => item.selected && item.status === 'new');
+    this.uploadProgress.set({ processed: 0, total: selected.length, active: true });
+    for (const row of selected) {
+      this.replaceScan(row.id, await this.uploadPatch(row));
+      this.uploadProgress.update((progress) => ({
+        ...progress,
+        processed: progress.processed + 1,
+      }));
     }
-    await this.refresh();
-    this.busy.set(false);
+    try {
+      await this.refresh();
+    } finally {
+      this.uploadProgress.update((progress) => ({ ...progress, active: false }));
+      this.busy.set(false);
+    }
   }
   async preview(photo: LeanPhoto): Promise<void> {
     this.closePreview();
@@ -213,5 +261,24 @@ export class App implements OnInit {
     this.scanResults.update((rows) =>
       rows.map((row) => (row.id === id ? { ...row, ...patch } : row)),
     );
+  }
+  private async uploadPatch(row: ScanResult): Promise<Partial<ScanResult>> {
+    try {
+      await this.scanner.upload(row);
+      return { status: 'uploaded', selected: false, detail: 'Uploaded' };
+    } catch (error) {
+      if (error instanceof ApiConflictError)
+        return {
+          status: 'duplicate',
+          selected: false,
+          duplicateUuid: error.uuid,
+          detail: error.message,
+        };
+      return {
+        status: 'error',
+        selected: false,
+        detail: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 }
